@@ -3,7 +3,8 @@
  *   node demo/shop/server.ts            -> http://localhost:4173
  *
  * It is deliberately small but realistic: a product list from an API, a cart
- * that changes server state, a search box, a newsletter form and footer links.
+ * that changes server state, a search box, a newsletter form and footer links,
+ * plus per-user profile pages and a note addressed by a cuid (view normalization).
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
  */
@@ -66,6 +67,15 @@ loadCart().catch(() => {});
 const simplePage = (title: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body><h1>${title}</h1><a href="/">Back to shop</a></body></html>`;
 
+const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+// Per-user page: each test visits its own user, like suites that create a fresh user per test.
+const profilePage = (username: string) =>
+  `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Profile</title></head><body>
+<h1>${escapeHtml(username)}</h1><button id="follow" aria-pressed="false">Follow</button> <a href="/">Back to shop</a>
+<script>document.getElementById('follow').addEventListener('click', (e) => { e.target.setAttribute('aria-pressed', 'true'); });</script>
+</body></html>`;
+
 export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Server> {
   let cart: number[] = [];
   const server = createServer((req, res) => {
@@ -98,6 +108,10 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/cart') return res.end(simplePage('Your cart'));
     if (url.pathname === '/about') return res.end(simplePage('About us'));
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
+    const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
+    if (user) return res.end(profilePage(user[1]!));
+    // Notes are addressed by a cuid, as in Prisma-backed apps.
+    if (/^\/notes\/c[a-z0-9]{24}$/.test(url.pathname)) return res.end(simplePage('Note'));
     res.writeHead(404);
     res.end('Not found');
   });

@@ -11,13 +11,26 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NUMBER = /^\d+$/;
 const HASHLIKE = /^[0-9a-f]{16,}$/i;
 
-/** Turn /orders/123/items/9f1c...e2 into /orders/:id/items/:uuid */
+/**
+ * Generated ids that are not numbers, uuids or hex: cuid, cuid2, nanoid, ulid.
+ * Shape: 20+ chars of [A-Za-z0-9_-], at least one letter AND one digit.
+ * Slugs like "how-to-test-in-2024-and-beyond" are kept: a segment with - or _
+ * is never an id when one of its pieces is a plain lowercase word (3+ letters).
+ */
+export function isGeneratedId(seg: string): boolean {
+  if (seg.length < 20 || !/^[A-Za-z0-9_-]+$/.test(seg)) return false;
+  if (!/[A-Za-z]/.test(seg) || !/\d/.test(seg)) return false;
+  return !seg.split(/[-_]/).some((part, _i, all) => all.length > 1 && /^[a-z]{3,}$/.test(part));
+}
+
+/** Turn /orders/123/items/9f1c...e2 into /orders/:id/items/:uuid; cuid/nanoid/ulid ids become :id */
 export function normalizePath(pathname: string): string {
   const parts = pathname.split('/').map((seg) => {
     if (seg === '') return seg;
     if (NUMBER.test(seg)) return ':id';
     if (UUID.test(seg)) return ':uuid';
     if (HASHLIKE.test(seg)) return ':hash';
+    if (isGeneratedId(seg)) return ':id';
     return seg;
   });
   const joined = parts.join('/');

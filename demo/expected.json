@@ -2,8 +2,9 @@
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
-    "tested": ["button|Add to cart|", "textbox|Search|"]
+    "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|"]
   },
+  "views": ["/", "/users/:param", "/notes/:id"],
   "proof": {
     "GET /api/products": { "http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed" },
     "GET /api/cart": { "http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "survived" },
