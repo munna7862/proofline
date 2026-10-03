@@ -6,7 +6,7 @@
  *
  * Why this exists: the runner adapter is thin; the engine is where bugs hide.
  * This script is the engine's own test. It runs in CI on every commit.
- * The three "tests" below mirror demo/tests/shop.spec.ts step for step.
+ * The "tests" below mirror demo/tests/shop.spec.ts and profiles.spec.ts step for step.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
@@ -35,7 +35,7 @@ async function eventually(check: () => Promise<boolean>, what: string, timeout =
 }
 const textOf = (page: Page, sel: string) => page.locator(sel).first().textContent({ timeout: 500 });
 
-type DemoTest = TestRef & { body: (page: Page) => Promise<void> };
+type DemoTest = TestRef & { start?: string; body: (page: Page) => Promise<void> };
 const tests: DemoTest[] = [
   {
     testId: 't1', title: 'shows products with prices', file: 'demo/tests/shop.spec.ts', line: 15,
@@ -60,13 +60,35 @@ const tests: DemoTest[] = [
       await page.getByPlaceholder('Search products').fill('kurta', { timeout: 2000 });
     },
   },
+  // demo/tests/profiles.spec.ts: per-user pages and a cuid URL (view normalization)
+  {
+    testId: 'p1', title: 'profile shows the username', file: 'demo/tests/profiles.spec.ts', line: 9, start: '/users/asha_rao',
+    body: async (page) => {
+      await eventually(async () => (await textOf(page, 'h1')) === 'asha_rao', 'username heading');
+    },
+  },
+  {
+    testId: 'p2', title: 'follow button toggles', file: 'demo/tests/profiles.spec.ts', line: 14, start: '/users/ben_okafor',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Follow' }).click({ timeout: 2000 });
+      await eventually(async () => (await page.locator('#follow').getAttribute('aria-pressed')) === 'true', 'following');
+    },
+  },
+  {
+    testId: 'p3', title: 'profile and note open', file: 'demo/tests/profiles.spec.ts', line: 21, start: '/users/chen_li',
+    body: async (page) => {
+      if ((await page.title()) !== 'Profile') throw new Error('title');
+      await page.goto(`${BASE}/notes/cmusge6wr0004pndce18dw4iq`);
+      if ((await page.title()) !== 'Note') throw new Error('note title');
+    },
+  },
 ];
 
 async function runTest(ctx: BrowserContext, t: DemoTest): Promise<string> {
   await fetch(`${BASE}/api/reset`, { method: 'POST' });
   const page = await ctx.newPage();
   try {
-    await page.goto(BASE);
+    await page.goto(BASE + (t.start ?? ''));
     await t.body(page);
     return 'passed';
   } catch {

@@ -18,7 +18,7 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
 
 ## Tasks
 
-- [ ] **S2-T1 Normalize generated ids and per-user segments (3 h, learned-param rule needs approval)**
+- [x] **S2-T1 Normalize generated ids and per-user segments (3 h, learned-param rule needs approval)**
   Root cause of the unstable denominator (epic-stack 554 → 680 between identical runs) and of 4 of 4 per-user endpoint faults being "not reached".
   Part 1 (no approval): in `src/util/normalize.ts` and the agent's copy in `src/page/agent.ts`, map cuid/cuid2/nanoid/ulid shapes (mixed letters and digits, length ≥ 20) to `:id`, alongside existing numeric/uuid rules. Because `inject.ts` matches through `normalizePath`, fault injection follows automatically.
   Part 2 (after approval): learned `:param` for view keys in `src/coverage/aggregate.ts`, pure and deterministic (sorted input, no randomness).
@@ -26,7 +26,7 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
   Accept:
   - Unit tests: `normalizePath('/notes/cmusge6wr0004pndce18dw4iq')` → `/notes/:id`; `/users/ag_theodora_conroy` stays verbatim through `normalizePath`; plain words like `/settings/notifications` are never collapsed.
   - `npm run calibrate` passes; the views list matches ground truth; commit message states the old and new demo summary line.
-  - epic-stack: two identical coverage runs print the same denominator.
+  - epic-stack: two identical coverage runs print the same denominator. *(Trial repos are on the founder's machine; checked in S2-T5.)*
   Prompt:
   > Read AGENTS.md, then src/util/normalize.ts and the header comment of src/page/agent.ts. Add cuid/cuid2/nanoid/ulid shape normalization to both copies of normalizePath (letters+digits mixed, length >= 20, never a plain word). Add unit tests in test/ for positive and negative cases. Add a demo route with a cuid in the path, a test that visits it, and a views entry in demo/expected.json. Run npm run calibrate and npm run verify and paste the summary lines. Do not implement learned :param collapsing until the founder approves the rule in docs/sprints/SPRINT_02.md; then implement it as a pure function in src/coverage/aggregate.ts with its own unit tests and demo case.
 

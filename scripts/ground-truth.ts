@@ -8,6 +8,8 @@ import type { CoverageSummary, ProofSummary } from '../src/types.ts';
 
 interface GroundTruth {
   coverage: { untested: string[]; tested: string[] };
+  /** Exact set of view keys the coverage summary must contain. */
+  views?: string[];
   proof: Record<string, Record<string, string>>;
   weakestTest: string;
 }
@@ -23,6 +25,11 @@ export function compareWithGroundTruth(
   proof: ProofSummary | undefined,
 ): string[] {
   const failures: string[] = [];
+  if (coverage && expected.views) {
+    const got = coverage.views.map((v) => v.view).sort();
+    const want = [...expected.views].sort();
+    if (got.join('\n') !== want.join('\n')) failures.push(`coverage: views expected [${want.join(', ')}], got [${got.join(', ')}]`);
+  }
   if (coverage) {
     const allEls = coverage.views.flatMap((v) => v.elements);
     for (const [keys, shouldBeTested] of [[expected.coverage.untested, false], [expected.coverage.tested, true]] as const) {

@@ -59,6 +59,14 @@ export function proofAgent(opts: AgentOptions): void {
         if (/^\d+$/.test(s)) return ':id';
         if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return ':uuid';
         if (/^[0-9a-f]{16,}$/i.test(s)) return ':hash';
+        if (
+          s.length >= 20 &&
+          /^[A-Za-z0-9_-]+$/.test(s) &&
+          /[A-Za-z]/.test(s) &&
+          /\d/.test(s) &&
+          !s.split(/[-_]/).some((part, _i, all) => all.length > 1 && /^[a-z]{3,}$/.test(part))
+        )
+          return ':id';
         return s;
       })
       .join('/');

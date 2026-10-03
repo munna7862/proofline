@@ -26,3 +26,19 @@ test('shortHash is stable', () => {
   assert.equal(shortHash('abc'), shortHash('abc'));
   assert.notEqual(shortHash('abc'), shortHash('abd'));
 });
+
+test('normalizePath maps cuid, cuid2, nanoid and ulid shapes to :id', () => {
+  assert.equal(normalizePath('/notes/cmusge6wr0004pndce18dw4iq'), '/notes/:id');
+  assert.equal(normalizePath('/notes/fdf6qsvrkvfnw2ctkcjhdsog'), '/notes/:id');
+  assert.equal(normalizePath('/s/V1StGXR8_Z5jdHi6B-myT'), '/s/:id');
+  assert.equal(normalizePath('/e/01ARZ3NDEKTSV4RRFFQ69G5FAV'), '/e/:id');
+  assert.equal(endpointKey('GET', 'http://x.test/api/notes/cmusge6wr0004pndce18dw4iq'), 'GET http://x.test/api/notes/:id');
+});
+
+test('normalizePath keeps words, usernames and slugs', () => {
+  assert.equal(normalizePath('/users/ag_theodora_conroy'), '/users/ag_theodora_conroy');
+  assert.equal(normalizePath('/settings/notifications'), '/settings/notifications');
+  assert.equal(normalizePath('/settings/notificationspreferences'), '/settings/notificationspreferences');
+  assert.equal(normalizePath('/blog/how-to-test-in-2024-and-beyond'), '/blog/how-to-test-in-2024-and-beyond');
+  assert.equal(normalizePath('/v/abc123'), '/v/abc123');
+});
