@@ -1,4 +1,4 @@
-import type { CoverageSummary, ElementCoverage, TestCoverageRecord, ViewCoverage } from '../types.ts';
+import type { CoverageSummary, ElementCoverage, ElementInfo, TestCoverageRecord, ViewCoverage } from '../types.ts';
 
 /** Minimum number of distinct per-test values before a path segment becomes :param. */
 const LEARNED_PARAM_MIN_VALUES = 3;
@@ -96,6 +96,9 @@ export interface AggregateOptions {
  *  - Links follow the same rule: only a click counts. A link whose destination view
  *    was visited some other way stays untested and carries reachedByUrl: true.
  *  - score = tested / total over all non-ignored elements in all visited views.
+ *  - An element no test ever saw enabled (only `disabled` or inside `aria-busy="true"`,
+ *    e.g. a "Processing..." label) is not applicable: listed in neverEnabled, outside the score.
+ *    Seen enabled once, or interacted with, it is scored like any other element.
  *  - Per-test path segments are merged into one view first (see learnViewParams).
  */
 export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOptions = {}): CoverageSummary {
@@ -119,7 +122,8 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
       const map = elements.get(view) ?? new Map<string, ElementCoverage>();
       for (const el of els) {
         if (ignored(el.key)) continue;
-        if (!map.has(el.key)) map.set(el.key, { ...el, tested: false, testedBy: [] });
+        const prev = map.get(el.key);
+        if (!prev || (prev.disabled && !el.disabled)) map.set(el.key, { ...el, tested: false, testedBy: [] });
       }
       elements.set(view, map);
     }
@@ -133,6 +137,7 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
         const el = map.get(key);
         if (!el) continue;
         el.tested = true;
+        delete el.disabled; // a test interacted with it, so it was enabled
         if (!el.testedBy.includes(rec.title)) el.testedBy.push(rec.title);
       }
     }
@@ -142,7 +147,7 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
   const untestedLinks = new Map<string, Set<string>>();
   for (const [view, map] of elements) {
     for (const el of map.values()) {
-      if (el.role !== 'link' || !el.href || el.tested) continue;
+      if (el.role !== 'link' || !el.href || el.tested || el.disabled) continue;
       if ((visitedViews.get(el.href)?.size ?? 0) > 0) {
         el.reachedByUrl = true;
       } else {
@@ -155,9 +160,16 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
 
   const views: ViewCoverage[] = [...elements.entries()]
     .map(([view, map]) => {
-      const els = [...map.values()].sort((a, b) => Number(a.tested) - Number(b.tested) || a.key.localeCompare(b.key));
+      const all = [...map.values()];
+      const els = all
+        .filter((e) => !e.disabled)
+        .sort((a, b) => Number(a.tested) - Number(b.tested) || a.key.localeCompare(b.key));
+      const neverEnabled: ElementInfo[] = all
+        .filter((e) => e.disabled)
+        .map(({ tested: _t, testedBy: _b, reachedByUrl: _r, ...info }) => info)
+        .sort((a, b) => a.key.localeCompare(b.key));
       const tested = els.filter((e) => e.tested).length;
-      return { view, visitedBy: [...(visitedViews.get(view) ?? [])], elements: els, tested, total: els.length };
+      return { view, visitedBy: [...(visitedViews.get(view) ?? [])], elements: els, tested, total: els.length, neverEnabled };
     })
     .sort((a, b) => a.tested / Math.max(a.total, 1) - b.tested / Math.max(b.total, 1));
 
@@ -170,6 +182,7 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
     score: total ? Math.round((tested / total) * 1000) / 10 : 0,
     tested,
     total,
+    neverEnabled: views.reduce((n, v) => n + v.neverEnabled.length, 0),
     views,
     untestedLinks: [...untestedLinks.entries()].map(([href, from]) => ({ href, from: [...from] })),
   };

@@ -104,6 +104,16 @@ export function proofAgent(opts: AgentOptions): void {
     return 'generic';
   };
 
+  // Form fields hold what the user typed or picked (a search term, C:\fakepath\photo.png),
+  // so their value and text are never a name: label, then name/id, then placeholder.
+  const isField = (el: Element) => {
+    const tag = el.tagName;
+    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+    if (tag !== 'INPUT') return false;
+    const t = ((el as HTMLInputElement).type || 'text').toLowerCase();
+    return t !== 'submit' && t !== 'button' && t !== 'reset' && t !== 'image';
+  };
+
   const nameOf = (el: Element) => {
     const aria = el.getAttribute('aria-label');
     if (aria) return clean(aria);
@@ -117,12 +127,18 @@ export function proofAgent(opts: AgentOptions): void {
     }
     const labels = (el as HTMLInputElement).labels;
     if (labels && labels.length) return clean(Array.from(labels).map((l) => l.textContent).join(' '));
+    if (isField(el)) {
+      return clean(
+        el.getAttribute('name') || el.id || el.getAttribute('placeholder') || el.getAttribute('title') || '',
+      );
+    }
     const ph = el.getAttribute('placeholder');
     if (ph) return clean(ph);
     const title = el.getAttribute('title') || el.getAttribute('alt');
     if (title) return clean(title);
     const text = (el as HTMLElement).innerText || el.textContent;
     if (text && text.trim()) return clean(text);
+    // Button-like inputs (submit, button, reset) are labelled by their value.
     const val = (el as HTMLInputElement).value;
     if (typeof val === 'string' && el.tagName === 'INPUT') return clean(val);
     return clean(el.getAttribute('name') || el.id || '');
@@ -148,6 +164,16 @@ export function proofAgent(opts: AgentOptions): void {
     return parts.join(' > ');
   };
 
+  // Disabled, or inside a region marked aria-busy="true": a transient state such as
+  // "Processing..." that no test can interact with.
+  const isDisabled = (el: Element) => {
+    try {
+      return el.matches(':disabled') || !!el.closest('[aria-busy="true"]');
+    } catch {
+      return false;
+    }
+  };
+
   const describe = (el: Element) => {
     const role = roleOf(el);
     const name = nameOf(el);
@@ -161,6 +187,7 @@ export function proofAgent(opts: AgentOptions): void {
       testId,
       href,
       path: cssPath(el),
+      ...(isDisabled(el) ? { disabled: true } : {}),
     };
   };
 
@@ -170,7 +197,8 @@ export function proofAgent(opts: AgentOptions): void {
     return el.getClientRects().length > 0;
   };
 
-  const seenPerView: Record<string, Record<string, true>> = {};
+  // key -> 'enabled' | 'disabled'. A key first seen disabled is sent again once it is seen enabled.
+  const seenPerView: Record<string, Record<string, string>> = {};
 
   const scan = () => {
     const view = viewOf(location.href);
@@ -179,8 +207,10 @@ export function proofAgent(opts: AgentOptions): void {
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (!isVisible(el)) return;
       const d = describe(el);
-      if (seen[d.key]) return; // grouping: same role+name+testid counts once per view
-      seen[d.key] = true;
+      const state = d.disabled ? 'disabled' : 'enabled';
+      // grouping: same role+name+testid counts once per view
+      if (seen[d.key] === 'enabled' || seen[d.key] === state) return;
+      seen[d.key] = state;
       fresh.push(d);
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
@@ -217,7 +247,7 @@ export function proofAgent(opts: AgentOptions): void {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled'],
+      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy'],
     });
   };
 

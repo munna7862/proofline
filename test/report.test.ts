@@ -19,3 +19,13 @@ test('reports say when a link was reached by URL but never clicked', () => {
   assert.doesNotMatch(md, /Buy †/);
   assert.match(renderReport({ project: 'p', coverage: c }), /Destination visited by URL, link never clicked/);
 });
+
+test('reports list never-enabled elements as not applicable, outside the score', () => {
+  const c = aggregateCoverage([
+    { testId: 'a', title: 'A', file: 'f', line: 1, views: ['/'], inventory: { '/': [el('button', 'Buy'), { ...el('button', 'Processing...'), disabled: true }] }, interactions: {} },
+  ]);
+  const html = renderReport({ project: 'p', coverage: c });
+  assert.match(html, /Not applicable: never enabled/);
+  assert.match(html, /0 of 1 interactive elements touched by 1 tests, 1 not applicable \(never enabled\)/);
+  assert.match(renderMarkdown(c), /0 of 1 interactive elements touched by 1 tests, 1 not applicable \(never enabled\)/);
+});

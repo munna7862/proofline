@@ -9,6 +9,8 @@
 ## Decisions (founder approved 2026-10-03: all four as recommended)
 S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: yes, both parts.
 
+**Open (found in S2-T3, needs founder approval: scoring):** Playwright's `setInputFiles` dispatches untrusted `input`/`change` events, and the agent counts only trusted events, so a file input a test fills is always "untested" (demo: `textbox|avatar|`). Recommendation: accept untrusted `input`/`change` on `input[type=file]` only. Apps rarely dispatch their own `input`/`change` events on a file input, so the risk of counting app code as a test is low. Ground truth would move `textbox|avatar|` to tested (demo 4/12 → 5/12).
+
 | Task | Decision | Recommendation |
 |---|---|---|
 | S2-T1 | Collapse a path segment into `:param` when the baseline shows the same parent with 3+ different values, each seen in only one test (catches faker usernames)? Risk: merges genuinely different pages such as `/docs/intro` and `/docs/api`. | Yes for views only, minimum 3 values, never for segments that also appear as fixed links in the inventory. Endpoints keep shape-based rules only this sprint. |
@@ -40,7 +42,7 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
   Prompt:
   > Read AGENTS.md and the founder's decision for S2-T2 in docs/sprints/SPRINT_02.md. In src/coverage/aggregate.ts, remove the rule that marks a link tested when its destination view was visited; keep that fact as reachedByUrl on the untested entry. Show it in the HTML report and Markdown summary as "Destination visited by URL, link never clicked". Add a demo link reached only via page.goto, a ground-truth entry in demo/expected.json and a unit test. Run npm run calibrate (show before/after summary line) and npm run verify.
 
-- [ ] **S2-T3 No phantom elements from busy states and file inputs (2 h, needs approval: inventory rule)**
+- [x] **S2-T3 No phantom elements from busy states and file inputs (2 h, needs approval: inventory rule)**
   buggy-books: "Authenticating...", "Creating account...", "Processing..." (×2), "Uploading Picture..." appear as untested elements; the file input appears as 4 elements named `C:\fakepath\...`.
   Accept:
   - Agent never uses `value` as the accessible name for `input[type=file]` (or any input whose value is user-typed); falls back to label, then `id`/`name`, then placeholder.

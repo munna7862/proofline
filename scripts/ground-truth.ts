@@ -12,6 +12,10 @@ interface GroundTruth {
   views?: string[];
   /** Links that must be untested with reachedByUrl on every view they appear on. */
   reachedByUrl?: string[];
+  /** Exact scored element keys per view: no phantoms (busy labels, file names), no duplicates. */
+  elements?: Record<string, string[]>;
+  /** Elements that must be "not applicable: never enabled", outside the score. */
+  neverEnabled?: string[];
   proof: Record<string, Record<string, string>>;
   weakestTest: string;
 }
@@ -37,6 +41,22 @@ export function compareWithGroundTruth(
       const els = coverage.views.flatMap((v) => v.elements).filter((e) => e.key === key);
       if (!els.length) failures.push(`coverage: link "${key}" not found in inventory`);
       else if (els.some((e) => e.tested || !e.reachedByUrl)) failures.push(`coverage: "${key}" should be untested with reachedByUrl`);
+    }
+  }
+  if (coverage && expected.elements) {
+    for (const [view, keys] of Object.entries(expected.elements)) {
+      const v = coverage.views.find((x) => x.view === view);
+      const got = (v?.elements ?? []).map((e) => e.key).sort();
+      const want = [...keys].sort();
+      if (got.join('\n') !== want.join('\n')) failures.push(`coverage: ${view} elements expected [${want.join(', ')}], got [${got.join(', ')}]`);
+    }
+  }
+  if (coverage && expected.neverEnabled) {
+    const na = coverage.views.flatMap((v) => v.neverEnabled.map((e) => e.key));
+    const scored = coverage.views.flatMap((v) => v.elements.map((e) => e.key));
+    for (const key of expected.neverEnabled) {
+      if (!na.includes(key)) failures.push(`coverage: "${key}" should be not applicable (never enabled)`);
+      if (scored.includes(key)) failures.push(`coverage: "${key}" is never enabled and must not be scored`);
     }
   }
   if (coverage) {

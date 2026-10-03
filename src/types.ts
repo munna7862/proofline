@@ -11,6 +11,8 @@ export interface ElementInfo {
   href?: string;
   /** Short CSS path, for humans to locate the element */
   path: string;
+  /** Seen only while `disabled` or inside `aria-busy="true"` (a busy label such as "Processing..."). */
+  disabled?: boolean;
 }
 
 export type AgentMessage =
@@ -43,6 +45,8 @@ export interface ViewCoverage {
   elements: ElementCoverage[];
   tested: number;
   total: number;
+  /** Not applicable, never enabled: seen only while disabled or busy. Outside the score, shown in the report. */
+  neverEnabled: ElementInfo[];
 }
 
 export interface CoverageSummary {
@@ -51,6 +55,8 @@ export interface CoverageSummary {
   score: number; // 0..100
   tested: number;
   total: number;
+  /** Elements outside the score because no test ever saw them enabled. */
+  neverEnabled: number;
   views: ViewCoverage[];
   untestedLinks: { href: string; from: string[] }[];
 }

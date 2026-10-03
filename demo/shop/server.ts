@@ -4,7 +4,8 @@
  *
  * It is deliberately small but realistic: a product list from an API, a cart
  * that changes server state, a search box, a newsletter form and footer links,
- * plus per-user profile pages and a note addressed by a cuid (view normalization).
+ * plus per-user profile pages and a note addressed by a cuid (view normalization),
+ * and an avatar upload whose button reads "Processing..." while disabled (no phantom elements).
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
  */
@@ -76,6 +77,36 @@ const profilePage = (username: string) =>
 <script>document.getElementById('follow').addEventListener('click', (e) => { e.target.setAttribute('aria-pressed', 'true'); });</script>
 </body></html>`;
 
+// Avatar upload: the file input has no label (named by its name attribute, never by the picked
+// file), and the button is disabled with a busy label while the request runs.
+const AVATAR_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Avatar</title></head><body>
+<h1>Avatar</h1>
+<form id="avatar-form"><input type="file" name="avatar" accept="image/*"> <button type="submit" id="upload">Upload</button></form>
+<p id="status" role="status"></p>
+<script>
+const form = document.getElementById('avatar-form');
+const btn = document.getElementById('upload');
+const status = document.getElementById('status');
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  btn.disabled = true;
+  btn.textContent = 'Processing...';
+  try {
+    const res = await fetch('/api/avatar', { method: 'POST', body: new FormData(form) });
+    status.textContent = res.ok ? 'Avatar saved' : 'Upload failed';
+  } catch {
+    status.textContent = 'Upload failed';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Upload';
+  }
+});
+</script>
+</body></html>`;
+
+/** How long the avatar upload takes: long enough for Proofline to see the busy button. */
+const UPLOAD_DELAY_MS = 800;
+
 export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Server> {
   let cart: number[] = [];
   const server = createServer((req, res) => {
@@ -99,6 +130,16 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
       });
       return;
     }
+    if (url.pathname === '/api/avatar' && req.method === 'POST') {
+      req.resume();
+      req.on('end', () => {
+        setTimeout(() => {
+          res.writeHead(204);
+          res.end();
+        }, UPLOAD_DELAY_MS);
+      });
+      return;
+    }
     if (url.pathname === '/api/reset' && req.method === 'POST') {
       cart = [];
       return json(200, { ok: true });
@@ -108,6 +149,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/cart') return res.end(simplePage('Your cart'));
     if (url.pathname === '/about') return res.end(simplePage('About us'));
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
+    if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
     // Notes are addressed by a cuid, as in Prisma-backed apps.

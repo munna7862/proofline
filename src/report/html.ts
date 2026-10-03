@@ -42,6 +42,8 @@ const OUTCOME_TEXT: Record<string, string> = {
 };
 
 export const REACHED_BY_URL = 'Destination visited by URL, link never clicked';
+export const NEVER_ENABLED = 'Not applicable: never enabled';
+const NEVER_ENABLED_HINT = 'Seen only while disabled or busy, so no test could use it. Not counted in the score.';
 
 function coverageSection(c: CoverageSummary): string {
   const views = c.views
@@ -66,7 +68,20 @@ function coverageSection(c: CoverageSummary): string {
                      }</li>`,
                  )
                  .join('')}</ul>`
-            : '<p class="ok">Every interactive element on this view was touched.</p>'
+            : v.total
+              ? '<p class="ok">Every interactive element on this view was touched.</p>'
+              : ''
+        }
+        ${
+          v.neverEnabled.length
+            ? `<p class="label" title="${NEVER_ENABLED_HINT}">${NEVER_ENABLED}</p>
+               <ul class="chips">${v.neverEnabled
+                 .map(
+                   (e) =>
+                     `<li class="chip chip-na" title="${esc(e.path)}"><span class="role">${esc(e.role)}</span> ${esc(e.name || e.testId || e.path)}</li>`,
+                 )
+                 .join('')}</ul>`
+            : ''
         }
         ${
           tested.length
@@ -91,7 +106,7 @@ function coverageSection(c: CoverageSummary): string {
 
   return `<section id="coverage">
     <h2>UI coverage</h2>
-    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. Links count only when clicked.</p>
+    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. Links count only when clicked. Elements only ever seen disabled or busy are not applicable and stay out of the score.</p>
     <div class="views">${views}</div>
     ${links}
   </section>`;
@@ -163,7 +178,7 @@ export function renderReport(input: ReportInput): string {
           <p class="score-name">UI coverage</p>
           <p class="score-value">${pct(c.score)}</p>
           ${meter(c.score, 'cov')}
-          <p class="muted">${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests</p>
+          <p class="muted">${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests${c.neverEnabled ? `, ${c.neverEnabled} not applicable (never enabled)` : ''}</p>
         </div>`
       : '',
     p
@@ -214,6 +229,7 @@ h4{margin:0;font-size:15px}
 .chips{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:6px}
 .chip{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;background:var(--paper)}
 .chip-gap{border-color:var(--bad);background:var(--bad-bg)}
+.chip-na{border-style:dashed;color:var(--muted)}
 .role{color:var(--muted);font-size:12px}
 .chip-note{color:var(--muted);font-size:12px}
 details{margin-top:10px}
