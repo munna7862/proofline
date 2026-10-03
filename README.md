@@ -48,6 +48,7 @@ npx playwright install chromium
 npm run verify        # typecheck + unit tests + engine calibration on the demo shop
 npm run demo          # coverage on the demo suite in the real runner
 npm run demo:scan     # fault check on the demo suite
+npm run demo:check    # real-runner results vs demo/expected.json
 ```
 
 Start with `AGENTS.md`, then `docs/MASTER_PLAN.md` and `docs/sprints/SPRINT_01.md`.

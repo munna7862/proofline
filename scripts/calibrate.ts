@@ -9,7 +9,6 @@
  * The three "tests" below mirror demo/tests/shop.spec.ts step for step.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
-import { readFileSync } from 'node:fs';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
 import { aggregateCoverage } from '../src/coverage/aggregate.ts';
 import { injectMutant, NetworkRecorder } from '../src/proof/inject.ts';
@@ -18,6 +17,7 @@ import { renderReport } from '../src/report/html.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import { startShop } from '../demo/shop/server.ts';
 import { ensureDir } from '../src/util/store.ts';
+import { compareWithGroundTruth, loadGroundTruth } from './ground-truth.ts';
 import { writeFileSync } from 'node:fs';
 import type { MutantHitRecord, MutantResult, TestCoverageRecord, TestNetworkRecord, TestRef } from '../src/types.ts';
 
@@ -46,7 +46,7 @@ const tests: DemoTest[] = [
     },
   },
   {
-    testId: 't2', title: 'adds a product to the cart', file: 'demo/tests/shop.spec.ts', line: 21,
+    testId: 't2', title: 'adds a product to the cart', file: 'demo/tests/shop.spec.ts', line: 22,
     body: async (page) => {
       await page.locator('#products li', { hasText: 'Steel tiffin box' }).getByRole('button', { name: 'Add to cart' }).click({ timeout: 2000 });
       await eventually(async () => (await textOf(page, '[data-testid=cart-link]')) === 'Cart (1)', 'cart count 1');
@@ -54,7 +54,7 @@ const tests: DemoTest[] = [
     },
   },
   {
-    testId: 't3', title: 'search box accepts input', file: 'demo/tests/shop.spec.ts', line: 27,
+    testId: 't3', title: 'search box accepts input', file: 'demo/tests/shop.spec.ts', line: 28,
     body: async (page) => {
       if ((await page.title()) !== 'Demo Shop') throw new Error('title');
       await page.getByPlaceholder('Search products').fill('kurta', { timeout: 2000 });
@@ -124,28 +124,7 @@ async function main() {
     writeFileSync(`${OUT}/report/proof-summary.json`, JSON.stringify(proof, null, 2));
 
     // ---- Compare with ground truth ----
-    const expected = JSON.parse(readFileSync(new URL('../demo/expected.json', import.meta.url), 'utf8'));
-    const allEls = coverage.views.flatMap((v) => v.elements);
-    for (const key of expected.coverage.untested) {
-      const el = allEls.find((e) => e.key === key);
-      if (!el) failures.push(`coverage: element "${key}" not found in inventory`);
-      else if (el.tested) failures.push(`coverage: "${key}" should be untested`);
-    }
-    for (const key of expected.coverage.tested) {
-      const el = allEls.find((e) => e.key === key);
-      if (!el) failures.push(`coverage: element "${key}" not found in inventory`);
-      else if (!el.tested) failures.push(`coverage: "${key}" should be tested`);
-    }
-    for (const [endpoint, ops] of Object.entries<Record<string, string>>(expected.proof)) {
-      for (const [op, outcome] of Object.entries(ops)) {
-        const r = results.find((x) => `${x.mutant.method} ${new URL(x.mutant.pattern).pathname}` === endpoint && x.mutant.operator === op);
-        if (!r) failures.push(`proof: no mutant for ${endpoint} ${op}`);
-        else if (r.outcome !== outcome) failures.push(`proof: ${endpoint} ${op} expected ${outcome}, got ${r.outcome}`);
-      }
-    }
-    if (proof.weakestTests[0]?.test.title !== expected.weakestTest) {
-      failures.push(`proof: weakest test expected "${expected.weakestTest}", got "${proof.weakestTests[0]?.test.title}"`);
-    }
+    failures.push(...compareWithGroundTruth(loadGroundTruth(), coverage, proof));
 
     console.log(`UI coverage ${coverage.score}% (${coverage.tested}/${coverage.total}) | Fault check ${proof.score}% (${proof.killed} caught, ${proof.survived} slipped, ${proof.notApplicable} n/a)`);
     console.log(`Report: ${OUT}/report/index.html`);

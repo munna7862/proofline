@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 /**
  * Proofline talks between processes through files, not sockets:
@@ -40,4 +40,9 @@ export function readJsonDir<T>(dir: string): T[] {
   return readdirSync(dir)
     .filter((f) => f.endsWith('.json'))
     .map((f) => JSON.parse(readFileSync(join(dir, f), 'utf8')) as T);
+}
+
+/** Path relative to cwd with forward slashes, for console output on every OS. */
+export function displayPath(file: string, cwd: string = process.cwd()): string {
+  return relative(cwd, file).replace(/\\/g, '/');
 }

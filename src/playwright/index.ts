@@ -9,8 +9,7 @@
  *   mutant              inject the fault in PROOFLINE_MUTANT and record whether it was hit
  *   off                 do nothing
  *
- * STATUS: written against the documented Playwright fixture API, not yet run in this repo.
- * Sprint 1, task 1 verifies it on demo/ (see docs/sprints/SPRINT_01.md).
+ * Verified in the real Playwright runner on the demo suite (coverage, scan and replay, Sprint 1).
  */
 import { test as base, expect } from '@playwright/test';
 import { relative } from 'node:path';

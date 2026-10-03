@@ -2,12 +2,11 @@
  * Playwright reporter. Add to playwright.config.ts:
  *   reporter: [['list'], ['proofline/reporter']]
  *
- * STATUS: written against the documented Reporter API, not yet run in this repo.
+ * Verified in the real Playwright runner on the demo suite (Sprint 1).
  */
 import type { Reporter } from '@playwright/test/reporter';
-import { relative } from 'node:path';
 import { aggregateCoverage } from '../coverage/aggregate.ts';
-import { paths, readJsonDir, resetDir } from '../util/store.ts';
+import { displayPath, paths, readJsonDir, resetDir } from '../util/store.ts';
 import { writeReport } from '../report/write.ts';
 import type { TestCoverageRecord } from '../types.ts';
 
@@ -40,7 +39,7 @@ export default class ProoflineReporter implements Reporter {
     const summary = aggregateCoverage(records, this.options);
     const file = writeReport({ coverage: summary });
     console.log(
-      `[proofline] UI coverage ${Math.round(summary.score)}% (${summary.tested}/${summary.total} elements). Report: ${relative(process.cwd(), file)}`,
+      `[proofline] UI coverage ${Math.round(summary.score)}% (${summary.tested}/${summary.total} elements). Report: ${displayPath(file)}`,
     );
   }
 

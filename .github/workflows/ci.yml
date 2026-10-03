@@ -17,6 +17,8 @@ jobs:
         run: npm run verify
       - name: Dogfood on the demo shop (coverage + fault check)
         run: npm run demo && npm run demo:scan
+      - name: Real runner matches ground truth
+        run: npm run demo:check
       - uses: actions/upload-artifact@v4
         if: always()
         with:

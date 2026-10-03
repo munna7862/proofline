@@ -12,19 +12,19 @@
   Prompt (Claude Code or Antigravity):
   > Read AGENTS.md and docs/STATUS.md. Run npm install, npx playwright install chromium, then npm run verify. If anything fails, find the root cause and propose the smallest fix. Do not edit demo/expected.json.
 
-- [ ] **S1-T2 Adapter in the real runner (2 h)**
+- [x] **S1-T2 Adapter in the real runner (2 h)**
   `npm run demo`. Expect a report at demo/.proofline/report/index.html with UI coverage 2 of 7.
   Likely snags: tsc options for `.ts` import rewriting, package self-reference from demo/, reporter path.
   Prompt:
   > Run npm run demo. The goal is the coverage report in demo/.proofline/report with 2 of 7 elements touched, matching .proofline-calibration. If build or import resolution fails, fix it in tsconfig.build.json or package.json exports, keeping the demo importing 'proofline/playwright' exactly like a real user would.
 
-- [ ] **S1-T3 Scan in the real runner (2 h)**
+- [x] **S1-T3 Scan in the real runner (2 h)**
   `npm run demo:scan`. Expect 11 of 12 caught, the slip being GET /api/cart "Missing text".
   Then add `scripts/check-demo-scan.ts` that reads demo/.proofline/report/proof-summary.json and compares it with demo/expected.json; add it to CI.
   Prompt:
   > Run npm run demo:scan and compare the outcomes with demo/expected.json. If they differ, debug the fixture's mutant mode first (testInfo.status in teardown, file:line filters). Then write scripts/check-demo-scan.ts that fails when the real-runner results disagree with ground truth, and add it to .github/workflows/ci.yml.
 
-- [ ] **S1-T4 Windows pass (1 h, skip if you are on macOS/Linux only)**
+- [x] **S1-T4 Windows pass (1 h, skip if you are on macOS/Linux only)**
   Run S1-T2 and S1-T3 in PowerShell. Fix path separators and spawn issues.
 
 - [ ] **S1-T5 Validation kit (2 h)**

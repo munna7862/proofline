@@ -1,0 +1,9 @@
+{
+  "name": "proofline-demo",
+  "private": true,
+  "type": "module",
+  "description": "Calibration app and suite with known ground truth. Installs proofline the way a user would.",
+  "devDependencies": {
+    "proofline": "file:.."
+  }
+}
