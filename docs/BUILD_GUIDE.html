@@ -272,7 +272,7 @@ npx proofline check --min-coverage 50 --min-proof 70     CI gate, exits 1 below 
 </table></div>
 <h3 id="scoring-rules-fixed-documented-tested">Scoring rules (fixed, documented, tested)</h3>
 <ul>
-<li><strong>UI coverage</strong> = elements touched ÷ interactive elements seen, across visited pages. Repeated rows with the same role and name count once. A link also counts when a test visits the page it points to.</li>
+<li><strong>UI coverage</strong> = elements touched ÷ interactive elements seen, across visited pages. Repeated rows with the same role and name count once. Links count only when clicked; a link whose page was opened by URL is listed as &quot;Destination visited by URL, link never clicked&quot;.</li>
 <li><strong>Fault check</strong> = caught ÷ (caught + slipped through). "Not reached", "not applicable" and errors are shown but never counted.</li>
 <li>Only tests that pass the baseline are used. Fault runs use zero retries.</li>
 </ul>

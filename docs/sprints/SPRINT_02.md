@@ -30,7 +30,7 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
   Prompt:
   > Read AGENTS.md, then src/util/normalize.ts and the header comment of src/page/agent.ts. Add cuid/cuid2/nanoid/ulid shape normalization to both copies of normalizePath (letters+digits mixed, length >= 20, never a plain word). Add unit tests in test/ for positive and negative cases. Add a demo route with a cuid in the path, a test that visits it, and a views entry in demo/expected.json. Run npm run calibrate and npm run verify and paste the summary lines. Do not implement learned :param collapsing until the founder approves the rule in docs/sprints/SPRINT_02.md; then implement it as a pure function in src/coverage/aggregate.ts with its own unit tests and demo case.
 
-- [ ] **S2-T2 Links count only when clicked (2.5 h, needs approval: scoring + report layout)**
+- [x] **S2-T2 Links count only when clicked (2.5 h, needs approval: scoring + report layout)**
   buggy-books: 59 of 106 "tested" elements had no interaction; interaction-only coverage is 33.3%, not 75%.
   Accept (assuming decision A):
   - `src/coverage/aggregate.ts`: a link is tested only on interaction. A link whose destination was visited is untested and carries `reachedByUrl: true`.

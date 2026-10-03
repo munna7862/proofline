@@ -41,6 +41,8 @@ const OUTCOME_TEXT: Record<string, string> = {
   error: 'Run error',
 };
 
+export const REACHED_BY_URL = 'Destination visited by URL, link never clicked';
+
 function coverageSection(c: CoverageSummary): string {
   const views = c.views
     .map((v) => {
@@ -59,7 +61,9 @@ function coverageSection(c: CoverageSummary): string {
                <ul class="chips">${untested
                  .map(
                    (e) =>
-                     `<li class="chip chip-gap" title="${esc(e.path)}"><span class="role">${esc(e.role)}</span> ${esc(e.name || e.testId || e.path)}</li>`,
+                     `<li class="chip chip-gap" title="${esc(e.path)}"><span class="role">${esc(e.role)}</span> ${esc(e.name || e.testId || e.path)}${
+                       e.reachedByUrl ? ` <span class="chip-note">${REACHED_BY_URL}</span>` : ''
+                     }</li>`,
                  )
                  .join('')}</ul>`
             : '<p class="ok">Every interactive element on this view was touched.</p>'
@@ -87,7 +91,7 @@ function coverageSection(c: CoverageSummary): string {
 
   return `<section id="coverage">
     <h2>UI coverage</h2>
-    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. A link also counts when a test visits the page it points to.</p>
+    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. Links count only when clicked.</p>
     <div class="views">${views}</div>
     ${links}
   </section>`;
@@ -211,6 +215,7 @@ h4{margin:0;font-size:15px}
 .chip{border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:13px;background:var(--paper)}
 .chip-gap{border-color:var(--bad);background:var(--bad-bg)}
 .role{color:var(--muted);font-size:12px}
+.chip-note{color:var(--muted);font-size:12px}
 details{margin-top:10px}
 summary{cursor:pointer;color:var(--muted);font-size:13px}
 details .chips{margin-top:8px}

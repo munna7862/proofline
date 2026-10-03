@@ -33,6 +33,8 @@ export interface TestCoverageRecord {
 export interface ElementCoverage extends ElementInfo {
   tested: boolean;
   testedBy: string[];
+  /** Untested link whose destination view some test opened another way (page.goto, redirect). */
+  reachedByUrl?: boolean;
 }
 
 export interface ViewCoverage {

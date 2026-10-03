@@ -93,7 +93,8 @@ export interface AggregateOptions {
 /**
  * Semantics (documented in docs/ARCHITECTURE.md, keep in sync):
  *  - An element is "tested" if any test interacted with it on that view.
- *  - A link is also "tested" if any test visited its destination view.
+ *  - Links follow the same rule: only a click counts. A link whose destination view
+ *    was visited some other way stays untested and carries reachedByUrl: true.
  *  - score = tested / total over all non-ignored elements in all visited views.
  *  - Per-test path segments are merged into one view first (see learnViewParams).
  */
@@ -137,17 +138,14 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
     }
   }
 
-  // Links count as tested when their destination view was visited by any test.
+  // Untested links: note when the destination was reached by URL; otherwise list it as a page no test visits.
   const untestedLinks = new Map<string, Set<string>>();
   for (const [view, map] of elements) {
     for (const el of map.values()) {
-      if (el.role !== 'link' || !el.href) continue;
-      const visitors = visitedViews.get(el.href);
-      if (!el.tested && visitors && visitors.size > 0) {
-        el.tested = true;
-        el.testedBy.push(...visitors);
-      }
-      if (!el.tested) {
+      if (el.role !== 'link' || !el.href || el.tested) continue;
+      if ((visitedViews.get(el.href)?.size ?? 0) > 0) {
+        el.reachedByUrl = true;
+      } else {
         const from = untestedLinks.get(el.href) ?? new Set<string>();
         from.add(view);
         untestedLinks.set(el.href, from);

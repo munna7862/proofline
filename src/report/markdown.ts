@@ -1,5 +1,6 @@
 import type { CoverageSummary, ProofSummary } from '../types.ts';
 import { OPERATORS } from '../proof/operators.ts';
+import { REACHED_BY_URL } from './html.ts';
 
 /** Short Markdown for $GITHUB_STEP_SUMMARY or a PR comment. Keep it under ~40 lines. */
 export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
@@ -30,10 +31,16 @@ export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
   const gaps = c?.views.filter((v) => v.tested < v.total).slice(0, 5) ?? [];
   if (gaps.length) {
     lines.push('### Least-covered views', '');
+    let byUrl = false;
     for (const v of gaps) {
-      const names = v.elements.filter((e) => !e.tested).slice(0, 4).map((e) => e.name || e.role);
+      const names = v.elements
+        .filter((e) => !e.tested)
+        .slice(0, 4)
+        .map((e) => (e.name || e.role) + (e.reachedByUrl ? ' †' : ''));
+      byUrl ||= names.some((n) => n.endsWith(' †'));
       lines.push(`- \`${v.view}\`: ${v.tested}/${v.total} touched. Untouched: ${names.join(', ')}`);
     }
+    if (byUrl) lines.push('', `† ${REACHED_BY_URL}.`);
   }
   return lines.join('\n') + '\n';
 }

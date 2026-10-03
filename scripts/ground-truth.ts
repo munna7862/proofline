@@ -10,6 +10,8 @@ interface GroundTruth {
   coverage: { untested: string[]; tested: string[] };
   /** Exact set of view keys the coverage summary must contain. */
   views?: string[];
+  /** Links that must be untested with reachedByUrl on every view they appear on. */
+  reachedByUrl?: string[];
   proof: Record<string, Record<string, string>>;
   weakestTest: string;
 }
@@ -29,6 +31,13 @@ export function compareWithGroundTruth(
     const got = coverage.views.map((v) => v.view).sort();
     const want = [...expected.views].sort();
     if (got.join('\n') !== want.join('\n')) failures.push(`coverage: views expected [${want.join(', ')}], got [${got.join(', ')}]`);
+  }
+  if (coverage && expected.reachedByUrl) {
+    for (const key of expected.reachedByUrl) {
+      const els = coverage.views.flatMap((v) => v.elements).filter((e) => e.key === key);
+      if (!els.length) failures.push(`coverage: link "${key}" not found in inventory`);
+      else if (els.some((e) => e.tested || !e.reachedByUrl)) failures.push(`coverage: "${key}" should be untested with reachedByUrl`);
+    }
   }
   if (coverage) {
     const allEls = coverage.views.flatMap((v) => v.elements);

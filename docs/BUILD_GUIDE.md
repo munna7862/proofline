@@ -70,7 +70,7 @@ npx proofline check --min-coverage 50 --min-proof 70     CI gate, exits 1 below 
 | Missing text | Null names, blank labels | JSON strings (ids skipped) |
 
 ### Scoring rules (fixed, documented, tested)
-- **UI coverage** = elements touched ÷ interactive elements seen, across visited pages. Repeated rows with the same role and name count once. A link also counts when a test visits the page it points to.
+- **UI coverage** = elements touched ÷ interactive elements seen, across visited pages. Repeated rows with the same role and name count once. Links count only when clicked; a link whose page was opened by URL is listed as "Destination visited by URL, link never clicked".
 - **Fault check** = caught ÷ (caught + slipped through). "Not reached", "not applicable" and errors are shown but never counted.
 - Only tests that pass the baseline are used. Fault runs use zero retries.
 
