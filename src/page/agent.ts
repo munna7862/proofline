@@ -7,6 +7,8 @@
  *  - It must never throw into the app and never change app behaviour.
  *  - It only reports TRUSTED events (dispatched by Playwright's input pipeline),
  *    so the app's own programmatic el.click() calls do not count as "tested".
+ *    One exception: input/change on <input type=file>. Playwright's setInputFiles
+ *    dispatches those untrusted, and apps rarely fire them on file inputs themselves.
  */
 
 export interface AgentOptions {
@@ -225,8 +227,13 @@ export function proofAgent(opts: AgentOptions): void {
     }, 250);
   };
 
+  const isFileFill = (ev: Event) =>
+    (ev.type === 'input' || ev.type === 'change') &&
+    (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
+    ((ev.target as HTMLInputElement).type || '').toLowerCase() === 'file';
+
   const onEvent = (ev: Event) => {
-    if (!ev.isTrusted) return;
+    if (!ev.isTrusted && !isFileFill(ev)) return;
     const target = ev.target as Element | null;
     if (!target || typeof (target as any).closest !== 'function') return;
     const el = target.closest(opts.interactiveSelector);

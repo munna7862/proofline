@@ -9,7 +9,7 @@
 ## Decisions (founder approved 2026-10-03: all four as recommended)
 S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: yes, both parts.
 
-**Open (found in S2-T3, needs founder approval: scoring):** Playwright's `setInputFiles` dispatches untrusted `input`/`change` events, and the agent counts only trusted events, so a file input a test fills is always "untested" (demo: `textbox|avatar|`). Recommendation: accept untrusted `input`/`change` on `input[type=file]` only. Apps rarely dispatch their own `input`/`change` events on a file input, so the risk of counting app code as a test is low. Ground truth would move `textbox|avatar|` to tested (demo 4/12 → 5/12).
+**S2-T3 follow-up (founder approved 2026-10-03, as recommended):** Playwright's `setInputFiles` dispatches untrusted `input`/`change` events, so filled file inputs were always untested. The agent now accepts untrusted `input`/`change` on `input[type=file]` only; every other element still needs a trusted event. Demo 4/12 → 5/12.
 
 | Task | Decision | Recommendation |
 |---|---|---|
