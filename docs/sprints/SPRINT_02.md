@@ -6,8 +6,8 @@
 
 **Priority call:** coverage trust first, then fault-check trust. Four fixes finished and proven on real suites beat eight half-built ones. Shadow DOM, iframes and the config file move to Sprint 3 (see BACKLOG.md).
 
-## Decisions needed on day 1 (founder)
-Ask for all four at once so the work does not stall. S2-T1's shape-based part needs no approval and can start immediately.
+## Decisions (founder approved 2026-10-03: all four as recommended)
+S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: yes, both parts.
 
 | Task | Decision | Recommendation |
 |---|---|---|
