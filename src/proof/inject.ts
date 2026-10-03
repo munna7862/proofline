@@ -24,11 +24,13 @@ export class NetworkRecorder {
     const key = endpointKey(req.method(), req.url());
     const json = (resp.headers()['content-type'] ?? '').includes('json');
     const prev = this.uses.get(key);
+    const statuses = [...new Set([...(prev?.statuses ?? []), resp.status()])].sort((a, b) => a - b);
     this.uses.set(key, {
       key,
       method: req.method().toUpperCase(),
       pattern: patternOf(req.url()),
       json: Boolean(prev?.json || json),
+      statuses,
     });
   }
 

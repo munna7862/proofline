@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { aggregateCoverage } from './coverage/aggregate.ts';
-import { judgeMutant, planMutants, summarizeProof } from './proof/plan.ts';
+import { judgeMutant, plannedResult, planMutants, proofHeadline, summarizeProof } from './proof/plan.ts';
 import { DEFAULT_OPERATORS, OPERATORS } from './proof/operators.ts';
 import { loadSummaries, writeReport } from './report/write.ts';
 import { displayPath, paths, readJsonDir, resetDir } from './util/store.ts';
@@ -92,6 +92,13 @@ function cmdScan(): void {
 
   const results: MutantResult[] = [];
   mutants.forEach((m, i) => {
+    const path = new URL(m.pattern).pathname;
+    const planned = plannedResult(m);
+    if (planned) {
+      results.push(planned);
+      console.log(`   [${i + 1}/${mutants.length}] ${m.method} ${path} ${OPERATORS[m.operator].label}: not applicable, ${planned.reason}`);
+      return;
+    }
     const started = Date.now();
     resetDir(paths.mutant(m.id));
     const targets = [...new Set(m.tests.map((t) => `${t.file}:${t.line}`))];
@@ -102,13 +109,12 @@ function cmdScan(): void {
     const hits = readJsonDir<MutantHitRecord>(paths.mutant(m.id));
     const result = judgeMutant(m, hits, Date.now() - started);
     results.push(result);
-    const path = new URL(m.pattern).pathname;
     console.log(`   [${i + 1}/${mutants.length}] ${m.method} ${path} ${OPERATORS[m.operator].label}: ${result.outcome}`);
   });
 
   const proof = summarizeProof(results);
   const file = writeReport({ proof });
-  console.log(`3/3 Fault check ${Math.round(proof.score)}%: ${proof.killed} caught, ${proof.survived} slipped through.`);
+  console.log(`3/3 ${proofHeadline(proof)}`);
   console.log(`Report: ${displayPath(file)}`);
   if (values['min-proof'] && proof.score < Number(values['min-proof'])) {
     console.error(`Fault check ${proof.score}% is below --min-proof ${values['min-proof']}`);

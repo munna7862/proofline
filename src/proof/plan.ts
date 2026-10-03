@@ -19,10 +19,28 @@ export interface PlanOptions {
   exclude?: string[];
 }
 
+/** Faults that turn a response into a failure. On an endpoint that already fails they change nothing. */
+const FAILURE_OPERATORS = new Set<OperatorId>(['http-500', 'network-fail']);
+
+/** Reason text when every baseline response was an error, else undefined. Mixed endpoints are still faulted. */
+export function alreadyFailing(statuses: number[]): string | undefined {
+  if (!statuses.length || statuses.some((s) => s < 400)) return undefined;
+  return `already failing in baseline (${[...new Set(statuses)].sort((a, b) => a - b).join(', ')})`;
+}
+
+/** The result for a mutant the planner already ruled out, so the scan loop can skip running it. */
+export function plannedResult(mutant: Mutant): MutantResult | undefined {
+  if (!mutant.notApplicable) return undefined;
+  return { mutant, outcome: 'not-applicable', reason: mutant.notApplicable, survivors: [], killers: [], durationMs: 0 };
+}
+
 /** Baseline records -> mutants. Only tests that PASSED the baseline are used. */
 export function planMutants(baseline: TestNetworkRecord[], opts: PlanOptions = {}): Mutant[] {
   const operators = opts.operators ?? DEFAULT_OPERATORS;
-  const byEndpoint = new Map<string, { method: string; pattern: string; json: boolean; tests: TestRef[] }>();
+  const byEndpoint = new Map<
+    string,
+    { method: string; pattern: string; json: boolean; tests: TestRef[]; statuses: Set<number>; statusKnown: boolean }
+  >();
 
   for (const rec of baseline) {
     if (rec.status && rec.status !== 'passed') continue;
@@ -30,8 +48,18 @@ export function planMutants(baseline: TestNetworkRecord[], opts: PlanOptions = {
     for (const ep of rec.endpoints) {
       if (opts.include?.length && !opts.include.some((s) => ep.pattern.includes(s))) continue;
       if (opts.exclude?.some((s) => ep.pattern.includes(s))) continue;
-      const entry = byEndpoint.get(ep.key) ?? { method: ep.method, pattern: ep.pattern, json: false, tests: [] };
+      const entry = byEndpoint.get(ep.key) ?? {
+        method: ep.method,
+        pattern: ep.pattern,
+        json: false,
+        tests: [],
+        statuses: new Set<number>(),
+        statusKnown: true,
+      };
       entry.json ||= ep.json;
+      // A record without statuses (older baseline) makes the endpoint's status unknown: never n/a.
+      if (ep.statuses?.length) for (const s of ep.statuses) entry.statuses.add(s);
+      else entry.statusKnown = false;
       if (!entry.tests.some((t) => t.testId === ref.testId)) entry.tests.push(ref);
       byEndpoint.set(ep.key, entry);
     }
@@ -39,16 +67,19 @@ export function planMutants(baseline: TestNetworkRecord[], opts: PlanOptions = {
 
   const mutants: Mutant[] = [];
   for (const [key, ep] of byEndpoint) {
+    const failing = alreadyFailing(ep.statusKnown ? [...ep.statuses] : []);
     for (const opId of operators) {
       const op = OPERATORS[opId];
       if (op.needsJson && !ep.json) continue;
-      mutants.push({
+      const mutant: Mutant = {
         id: shortHash(`${key}|${opId}`),
         operator: opId,
         method: ep.method,
         pattern: ep.pattern,
         tests: ep.tests,
-      });
+      };
+      if (failing && FAILURE_OPERATORS.has(opId)) mutant.notApplicable = failing;
+      mutants.push(mutant);
     }
   }
   mutants.sort((a, b) => a.pattern.localeCompare(b.pattern) || a.operator.localeCompare(b.operator));
@@ -65,7 +96,7 @@ export function judgeMutant(mutant: Mutant, hits: MutantHitRecord[], durationMs:
     return { mutant, outcome: 'not-reached', survivors: [], killers: [], durationMs };
   }
   if (!relevant.some((h) => h.changed)) {
-    return { mutant, outcome: 'not-applicable', survivors: [], killers: [], durationMs };
+    return { mutant, outcome: 'not-applicable', reason: 'no data of that kind in the response', survivors: [], killers: [], durationMs };
   }
   const ref = (h: MutantHitRecord): TestRef => ({ testId: h.testId, title: h.title, file: h.file, line: h.line });
   const killers = relevant.filter((h) => h.status !== 'passed' && h.status !== 'skipped').map(ref);
@@ -77,6 +108,13 @@ export function judgeMutant(mutant: Mutant, hits: MutantHitRecord[], durationMs:
     killers,
     durationMs,
   };
+}
+
+/** One-line CLI result. A score over zero judged faults is meaningless, so it reads "n/a" instead of 0%. */
+export function proofHeadline(p: ProofSummary): string {
+  const na = p.notApplicable ? `, ${p.notApplicable} not applicable` : '';
+  if (p.killed + p.survived === 0) return `Fault check n/a (0 judged)${na}.`;
+  return `Fault check ${Math.round(p.score)}%: ${p.killed} caught, ${p.survived} slipped through${na}.`;
 }
 
 export function summarizeProof(results: MutantResult[]): ProofSummary {

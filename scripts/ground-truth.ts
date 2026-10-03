@@ -17,6 +17,8 @@ interface GroundTruth {
   /** Elements that must be "not applicable: never enabled", outside the score. */
   neverEnabled?: string[];
   proof: Record<string, Record<string, string>>;
+  /** Exact set of faults the planner rules out as "already failing in baseline", per endpoint. */
+  alreadyFailing?: Record<string, string[]>;
   weakestTest: string;
 }
 
@@ -76,6 +78,12 @@ export function compareWithGroundTruth(
         if (!r) failures.push(`proof: no mutant for ${endpoint} ${op}`);
         else if (r.outcome !== outcome) failures.push(`proof: ${endpoint} ${op} expected ${outcome}, got ${r.outcome}`);
       }
+    }
+    if (expected.alreadyFailing) {
+      const label = (r: ProofSummary['results'][number]) => `${r.mutant.method} ${new URL(r.mutant.pattern).pathname} ${r.mutant.operator}`;
+      const got = proof.results.filter((r) => r.reason?.startsWith('already failing in baseline')).map(label).sort();
+      const want = Object.entries(expected.alreadyFailing).flatMap(([ep, ops]) => ops.map((op) => `${ep} ${op}`)).sort();
+      if (got.join('\n') !== want.join('\n')) failures.push(`proof: already failing in baseline expected [${want.join(', ')}], got [${got.join(', ')}]`);
     }
     if (proof.weakestTests[0]?.test.title !== expected.weakestTest) {
       failures.push(`proof: weakest test expected "${expected.weakestTest}", got "${proof.weakestTests[0]?.test.title}"`);

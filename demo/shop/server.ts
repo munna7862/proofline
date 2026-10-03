@@ -5,6 +5,7 @@
  * It is deliberately small but realistic: a product list from an API, a cart
  * that changes server state, a search box, a newsletter form and footer links,
  * plus per-user profile pages and a note addressed by a cuid (view normalization),
+ * an account endpoint that answers 401 to guests (already failing in baseline),
  * and an avatar upload whose button reads "Processing..." while disabled (no phantom elements).
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
@@ -62,6 +63,8 @@ document.getElementById('search').addEventListener('input', (e) => {
 document.getElementById('newsletter').addEventListener('submit', (e) => { e.preventDefault(); });
 loadProducts().catch(() => { document.getElementById('status').textContent = 'Offline'; });
 loadCart().catch(() => {});
+// Greets a signed-in shopper. Demo visitors are guests, so this always answers 401 (already failing in baseline).
+fetch('/api/account').then((res) => { if (res.ok) document.getElementById('status').textContent = 'Welcome back'; }).catch(() => {});
 </script>
 </body></html>`;
 
@@ -140,6 +143,8 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
       });
       return;
     }
+    // Nobody signs in on the demo shop, so the account endpoint always answers 401.
+    if (url.pathname === '/api/account' && req.method === 'GET') return json(401, { user: null });
     if (url.pathname === '/api/reset' && req.method === 'POST') {
       cart = [];
       return json(200, { ok: true });

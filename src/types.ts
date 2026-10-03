@@ -67,6 +67,8 @@ export interface EndpointUse {
   method: string;
   pattern: string; // origin + normalized path
   json: boolean;
+  /** Distinct HTTP status codes seen in baseline, sorted. Status only, never bodies. */
+  statuses?: number[];
 }
 
 export interface TestRef {
@@ -90,6 +92,8 @@ export interface Mutant {
   pattern: string;
   /** Tests that called this endpoint during baseline; only these run for this mutant. */
   tests: TestRef[];
+  /** Set by the planner when the fault cannot change anything; such a mutant is never run. */
+  notApplicable?: string;
 }
 
 export type MutantOutcome = 'killed' | 'survived' | 'not-reached' | 'not-applicable' | 'error';
@@ -97,6 +101,8 @@ export type MutantOutcome = 'killed' | 'survived' | 'not-reached' | 'not-applica
 export interface MutantResult {
   mutant: Mutant;
   outcome: MutantOutcome;
+  /** Why the fault is not applicable; shown next to it in the report. */
+  reason?: string;
   /** Tests that stayed green while the fault was active: the actionable list. */
   survivors: TestRef[];
   killers: TestRef[];

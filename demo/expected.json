@@ -12,7 +12,9 @@
     "GET /api/products": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed"},
     "GET /api/cart": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "survived"},
     "POST /api/cart": {"http-500": "killed", "network-fail": "killed", "empty-json": "not-applicable", "shift-numbers": "not-applicable", "blank-strings": "not-applicable"},
-    "POST /api/avatar": {"http-500": "killed", "network-fail": "killed"}
+    "POST /api/avatar": {"http-500": "killed", "network-fail": "killed"},
+    "GET /api/account": {"http-500": "not-applicable", "network-fail": "not-applicable", "empty-json": "not-applicable", "shift-numbers": "not-applicable", "blank-strings": "not-applicable"}
   },
+  "alreadyFailing": {"GET /api/account": ["http-500", "network-fail"]},
   "weakestTest": "search box accepts input"
 }
