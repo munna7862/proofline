@@ -5,7 +5,10 @@ import { REACHED_BY_URL } from './html.ts';
 /** Short Markdown for $GITHUB_STEP_SUMMARY or a PR comment. Keep it under ~40 lines. */
 export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
   const lines: string[] = ['## Proofline', ''];
-  if (c) lines.push(`**UI coverage ${Math.round(c.score)}%** · ${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests`);
+  if (c) {
+    const na = c.neverEnabled ? `, ${c.neverEnabled} not applicable (never enabled)` : '';
+    lines.push(`**UI coverage ${Math.round(c.score)}%** · ${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests${na}`);
+  }
   if (p) lines.push(`**Fault check ${Math.round(p.score)}%** · ${p.killed} of ${p.killed + p.survived} injected faults caught`);
   lines.push('');
 

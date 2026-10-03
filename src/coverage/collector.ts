@@ -20,7 +20,11 @@ export class CoverageRecorder {
       this.views.add(msg.view);
     } else if (msg.type === 'inventory') {
       const map = this.inventory.get(msg.view) ?? new Map<string, ElementInfo>();
-      for (const el of msg.elements) if (!map.has(el.key)) map.set(el.key, el);
+      for (const el of msg.elements) {
+        const prev = map.get(el.key);
+        // An element seen enabled once is enabled for this test.
+        if (!prev || (prev.disabled && !el.disabled)) map.set(el.key, el);
+      }
       this.inventory.set(msg.view, map);
     } else if (msg.type === 'interaction') {
       const set = this.interactions.get(msg.view) ?? new Set<string>();

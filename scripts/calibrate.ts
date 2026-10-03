@@ -6,7 +6,7 @@
  *
  * Why this exists: the runner adapter is thin; the engine is where bugs hide.
  * This script is the engine's own test. It runs in CI on every commit.
- * The "tests" below mirror demo/tests/shop.spec.ts and profiles.spec.ts step for step.
+ * The "tests" below mirror demo/tests/shop.spec.ts, profiles.spec.ts and avatar.spec.ts step for step.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
@@ -80,6 +80,16 @@ const tests: DemoTest[] = [
       if ((await page.title()) !== 'Profile') throw new Error('title');
       await page.goto(`${BASE}/notes/cmusge6wr0004pndce18dw4iq`);
       if ((await page.title()) !== 'Note') throw new Error('note title');
+    },
+  },
+  // demo/tests/avatar.spec.ts: busy-state button and an unlabelled file input (no phantom elements)
+  {
+    testId: 'a1', title: 'avatar upload saves', file: 'demo/tests/avatar.spec.ts', line: 10, start: '/settings/avatar',
+    body: async (page) => {
+      await page.locator('input[type=file]').setInputFiles({ name: 'avatar.png', mimeType: 'image/png', buffer: Buffer.from('png') }, { timeout: 2000 });
+      await page.getByRole('button', { name: 'Upload' }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#status')) === 'Avatar saved', 'avatar saved');
+      await eventually(async () => page.getByRole('button', { name: 'Upload' }).isEnabled(), 'upload enabled again');
     },
   },
 ];

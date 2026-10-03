@@ -75,3 +75,29 @@ test('learnViewParams ignores record order', () => {
   const recs = [visit('a', '/u/aa'), visit('b', '/u/bb'), visit('c', '/u/cc')];
   assert.deepEqual([...learnViewParams(recs)].sort(), [...learnViewParams([...recs].reverse())].sort());
 });
+
+const off = (role: string, name: string) => ({ ...el(role, name), disabled: true });
+
+test('an element never seen enabled is not applicable and outside the score', () => {
+  const recs: TestCoverageRecord[] = [
+    { testId: 'a', title: 'A', file: 'f', line: 1, views: ['/'], inventory: { '/': [el('button', 'Upload'), off('button', 'Processing...')] }, interactions: { '/': ['button|Upload|'] } },
+  ];
+  const s = aggregateCoverage(recs);
+  assert.equal(s.tested, 1);
+  assert.equal(s.total, 1, 'the busy label is not in the denominator');
+  assert.equal(s.neverEnabled, 1);
+  assert.deepEqual(s.views[0]!.neverEnabled.map((e) => e.key), ['button|Processing...|']);
+  assert.equal(s.views[0]!.elements.some((e) => e.key === 'button|Processing...|'), false);
+});
+
+test('an element seen enabled in any test, or interacted with, is scored', () => {
+  const recs: TestCoverageRecord[] = [
+    { testId: 'a', title: 'A', file: 'f', line: 1, views: ['/'], inventory: { '/': [off('button', 'Save'), off('button', 'Send')] }, interactions: { '/': ['button|Send|'] } },
+    { testId: 'b', title: 'B', file: 'f', line: 2, views: ['/'], inventory: { '/': [el('button', 'Save')] }, interactions: {} },
+  ];
+  const s = aggregateCoverage(recs);
+  assert.equal(s.total, 2);
+  assert.equal(s.tested, 1);
+  assert.equal(s.neverEnabled, 0);
+  assert.equal(s.views[0]!.elements.some((e) => e.disabled), false);
+});
