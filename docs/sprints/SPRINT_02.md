@@ -52,7 +52,7 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
   Prompt:
   > Read AGENTS.md and the header comment of src/page/agent.ts (it runs in the browser and cannot import). Change element naming so input values are never used as names for file inputs, and skip disabled or aria-busy elements at capture time. Add a demo page with a busy-state submit button and a file input, ground truth in demo/expected.json, and unit tests where the logic is testable outside the browser. Run npm run calibrate (before/after summary line) and npm run verify.
 
-- [ ] **S2-T4 Already-failing endpoints are not slipped faults (2 h, needs approval: fault scoring)**
+- [x] **S2-T4 Already-failing endpoints are not slipped faults (2 h, needs approval: fault scoring)**
   buggy-books `POST /api/auth/refresh`: baseline 401, so 500 and network-fail "survived" and made UI_REF_02 the weakest test.
   Accept:
   - Baseline recorder stores the response status per endpoint per test (status only, never bodies).

@@ -12,7 +12,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
 import { aggregateCoverage } from '../src/coverage/aggregate.ts';
 import { injectMutant, NetworkRecorder } from '../src/proof/inject.ts';
-import { judgeMutant, planMutants, summarizeProof } from '../src/proof/plan.ts';
+import { judgeMutant, plannedResult, planMutants, summarizeProof } from '../src/proof/plan.ts';
 import { renderReport } from '../src/report/html.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import { startShop } from '../demo/shop/server.ts';
@@ -134,6 +134,11 @@ async function main() {
     const mutants = planMutants(baseline);
     const results: MutantResult[] = [];
     for (const m of mutants) {
+      const planned = plannedResult(m);
+      if (planned) {
+        results.push(planned);
+        continue;
+      }
       const started = Date.now();
       const hits: MutantHitRecord[] = [];
       for (const ref of m.tests) {

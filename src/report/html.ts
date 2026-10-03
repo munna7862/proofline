@@ -24,7 +24,7 @@ function meter(value: number, tone: 'cov' | 'proof'): string {
   return `<div class="meter meter-${tone}" role="img" aria-label="${pct(v)}"><span style="width:${v}%"></span></div>`;
 }
 
-function endpointLabel(r: MutantResult): string {
+export function endpointLabel(r: MutantResult): string {
   try {
     const u = new URL(r.mutant.pattern);
     return `${r.mutant.method} ${u.pathname}`;
@@ -115,7 +115,16 @@ function coverageSection(c: CoverageSummary): string {
 function proofSection(p: ProofSummary): string {
   const order: Record<string, number> = { survived: 0, killed: 1, error: 2, 'not-reached': 3, 'not-applicable': 4 };
   const shown = p.results.filter((r) => r.outcome === 'killed' || r.outcome === 'survived' || r.outcome === 'error');
-  const skipped = p.results.length - shown.length;
+  // Faults the planner ruled out get their reason spelled out; the rest stay a one-line count.
+  const ruledOut = p.results.filter((r) => r.outcome === 'not-applicable' && r.mutant.notApplicable);
+  const skipped = p.results.length - shown.length - ruledOut.length;
+  const ruledOutList = ruledOut.length
+    ? `<h3>Not applicable</h3>
+       <ul class="plain">${[...ruledOut]
+         .sort((a, b) => a.mutant.pattern.localeCompare(b.mutant.pattern) || a.mutant.operator.localeCompare(b.mutant.operator))
+         .map((r) => `<li><code>${esc(endpointLabel(r))}</code> ${esc(OPERATORS[r.mutant.operator].label)}: <span class="muted">${esc(r.reason ?? '')}</span></li>`)
+         .join('')}</ul>`
+    : '';
   const rows = [...shown]
     .sort((a, b) => order[a.outcome] - order[b.outcome] || a.mutant.pattern.localeCompare(b.mutant.pattern))
     .map((r) => {
@@ -148,6 +157,7 @@ function proofSection(p: ProofSummary): string {
       <tbody>${rows}</tbody>
     </table></div>
     ${skipped ? `<p class="muted note">${skipped} more faults were skipped: the response had no data of that kind, or no test reached the endpoint.</p>` : ''}
+    ${ruledOutList}
   </section>`;
 }
 
@@ -184,9 +194,9 @@ export function renderReport(input: ReportInput): string {
     p
       ? `<div class="score">
           <p class="score-name">Fault check</p>
-          <p class="score-value">${pct(p.score)}</p>
+          <p class="score-value">${p.killed + p.survived ? pct(p.score) : 'n/a'}</p>
           ${meter(p.score, 'proof')}
-          <p class="muted">${p.killed} of ${p.killed + p.survived} injected faults caught${p.notReached ? `, ${p.notReached} not reached` : ''}</p>
+          <p class="muted">${p.killed} of ${p.killed + p.survived} injected faults caught${p.notReached ? `, ${p.notReached} not reached` : ''}${p.notApplicable ? `, ${p.notApplicable} not applicable` : ''}</p>
         </div>`
       : '',
   ].join('');
