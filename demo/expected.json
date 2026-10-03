@@ -2,7 +2,7 @@
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
-    "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|"]
+    "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|"]
   },
   "reachedByUrl": ["link|Back to shop|"],
   "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar"],

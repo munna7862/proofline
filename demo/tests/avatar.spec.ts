@@ -2,7 +2,8 @@
  * Busy states and file inputs must not create phantom elements.
  * While the upload runs, the button is disabled and reads "Processing...": Proofline lists it
  * as "Not applicable: never enabled", outside the score. The file input has no label, so it is
- * named by its name attribute ("avatar"), never by the picked file (C:\fakepath\avatar.png).
+ * named by its name attribute ("avatar"), never by the picked file (C:\fakepath\avatar.png),
+ * and setInputFiles counts as testing it.
  * Both faults on POST /api/avatar are caught: the test asserts the saved message.
  */
 import { test, expect } from 'proofline/playwright';
