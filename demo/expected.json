@@ -4,6 +4,7 @@
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|"]
   },
+  "reachedByUrl": ["link|Back to shop|"],
   "views": ["/", "/users/:param", "/notes/:id"],
   "proof": {
     "GET /api/products": { "http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed" },

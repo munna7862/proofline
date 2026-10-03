@@ -3,6 +3,8 @@
  * Proofline should merge /users/asha_rao, /users/ben_okafor and /users/chen_li into
  * one view, /users/:param, and the cuid note URL into /notes/:id (demo/expected.json "views").
  * No API calls here, so these tests never enter the fault check.
+ * Nobody clicks "Back to shop": its destination (/) is opened by page.goto in shop.spec.ts,
+ * so it is untested with "Destination visited by URL, link never clicked".
  */
 import { test, expect } from 'proofline/playwright';
 

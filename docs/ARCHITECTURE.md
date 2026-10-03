@@ -35,7 +35,7 @@
 **UI coverage**
 - Interactive element = link, button, input, select, textarea, summary, contenteditable, ARIA widget roles, positive tabindex. Hidden elements are ignored.
 - Identity = role + accessible name (digits replaced by #) + test id, per view. Repeated rows with the same identity count once.
-- Tested = a trusted click, double-click, context-menu, input or change event on it (or inside it). Links also count when their destination view was visited.
+- Tested = a trusted click, double-click, context-menu, input or change event on it (or inside it). Links count only when clicked; a link whose destination some test opened by URL stays untested and is marked "Destination visited by URL, link never clicked".
 - View = path with ids, uuids and hashes normalized (numbers and cuid/cuid2/nanoid/ulid shapes become `:id`); hash-router paths included. Per-test segments are learned at aggregation: when 3+ values under the same parent each come from a different single test and none is a link shared by 2+ tests, that segment becomes `:param` (`/users/:param`).
 - Score = tested / total, across all visited views.
 
