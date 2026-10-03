@@ -1,0 +1,32 @@
+{
+  "name": "proofline",
+  "version": "0.1.0",
+  "description": "Proof that your Playwright tests work: UI coverage plus a fault check that breaks your APIs and shows which tests stay green.",
+  "type": "module",
+  "license": "MIT",
+  "bin": { "proofline": "./dist/cli.js" },
+  "exports": {
+    "./playwright": { "types": "./dist/playwright/index.d.ts", "default": "./dist/playwright/index.js" },
+    "./reporter": { "types": "./dist/playwright/reporter.d.ts", "default": "./dist/playwright/reporter.js" }
+  },
+  "files": ["dist", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "test": "node --test \"test/**/*.test.ts\"",
+    "calibrate": "node scripts/calibrate.ts",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "verify": "npm run typecheck && npm test && npm run calibrate",
+    "demo": "npm run build && cd demo && npx playwright test",
+    "demo:scan": "npm run build && cd demo && node ../dist/cli.js scan",
+    "shop": "node demo/shop/server.ts"
+  },
+  "peerDependencies": { "@playwright/test": ">=1.45.0" },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/node": "^22.0.0",
+    "playwright-core": "^1.56.0",
+    "typescript": "^5.9.0"
+  },
+  "keywords": ["playwright", "testing", "mutation-testing", "ui-coverage", "e2e", "qa"]
+}

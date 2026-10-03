@@ -1,0 +1,1 @@
+Run `npm run verify`. If anything fails, show the failing output, explain the root cause in two sentences, and propose the smallest fix. Do not change demo/expected.json to make calibration pass unless I agree the old expectation was wrong.

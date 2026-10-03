@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.proofline/
+.proofline-calibration/
+test-results/
+playwright-report/
+*.vsix
+.env
+vscode-extension/out/

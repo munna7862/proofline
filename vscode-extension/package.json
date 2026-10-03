@@ -1,0 +1,27 @@
+{
+  "name": "proofline-lens",
+  "displayName": "Proofline Lens",
+  "description": "See above each Playwright test how many injected faults it catches and what UI it touches.",
+  "version": "0.0.1",
+  "publisher": "REPLACE_WITH_YOUR_PUBLISHER_ID",
+  "license": "MIT",
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Testing"],
+  "activationEvents": ["workspaceContains:**/.proofline/report/proof-summary.json", "onLanguage:typescript", "onLanguage:javascript"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "proofline.openReport", "title": "Proofline: Open report" },
+      { "command": "proofline.replay", "title": "Proofline: Replay fault" }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "package": "npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.90.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.9.0"
+  }
+}

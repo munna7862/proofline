@@ -1,0 +1,1 @@
+Read docs/MASTER_PLAN.md, docs/STATUS.md and the latest sprint file. Draft the next sprint as docs/sprints/SPRINT_NN.md using the same format: goal, capacity (14 hours), tasks with acceptance criteria and estimates, demo at the end, risks. Use the product-owner agent to cut scope until it fits 14 hours.
