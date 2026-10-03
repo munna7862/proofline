@@ -17,6 +17,7 @@ One line per finished task: date, task id, result, the verify summary line.
   - munna7862/buggy-books (playwright-e2e, CommonJS project, 55 tests, Playwright 1.63): integration worked unchanged (ESM package loads from CJS). Coverage 75% (106/141). Scan `--max-mutants 20`: 65% (11 caught, 6 slipped, 3 n/a, 0 not reached), 54/54 baseline passing, about 45 min.
   - epicweb-dev/epic-stack (React Router 7 + SQLite, 24 tests, Playwright 1.58, MIT): same 3 dev-server timeouts with and without Proofline (Proofline does not break tests). Coverage 23–25% (127/554, then 167/680 on a re-run). Scan `--max-mutants 20`: 88% (14 caught, 2 slipped, 4 not reached), 23/24 baseline passing.
   - True positive worth showing: buggy-books `GET /api/books` "Wrong numbers" slipped past all 49 tests that load the catalog; only the detail page asserts a price (`GET /api/books/:id` "Wrong numbers" was caught).
+- 2026-10-03 S1-T7 done: Sprint 2 drafted in docs/sprints/SPRINT_02.md (coverage and fault-check trust: id normalization, links count only when clicked, no phantom elements, already-failing endpoints, before/after re-run of both trials; 13 h + 1 h buffer). Cut items moved to BACKLOG.md. S1-T5 carried over (founder). Verify: `UI coverage 28.6% (2/7) | Fault check 91.7% (11 caught, 1 slipped, 3 n/a)`, 16/16 unit tests.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

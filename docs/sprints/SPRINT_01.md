@@ -35,7 +35,7 @@
   Prompt:
   > I cloned <repo>. Add Proofline the way docs say (change the test import, add the reporter) on a local branch only. Run coverage, then npx proofline scan --max-mutants 20. Make a table of anything that looks misclassified, with evidence, and add it to docs/STATUS.md under "Sprint 2 candidates".
 
-- [ ] **S1-T7 Retro and plan Sprint 2 (1 h)**
+- [x] **S1-T7 Retro and plan Sprint 2 (1 h)**
   `/plan-sprint` (Claude Code) or the plan-sprint workflow (Antigravity).
 
 ## Risks this sprint
