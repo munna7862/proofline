@@ -9,6 +9,7 @@
     "./playwright": { "types": "./dist/playwright/index.d.ts", "default": "./dist/playwright/index.js" },
     "./reporter": { "types": "./dist/playwright/reporter.d.ts", "default": "./dist/playwright/reporter.js" }
   },
+  "workspaces": ["demo"],
   "files": ["dist", "README.md", "LICENSE"],
   "engines": { "node": ">=22.18" },
   "scripts": {
@@ -19,6 +20,7 @@
     "verify": "npm run typecheck && npm test && npm run calibrate",
     "demo": "npm run build && cd demo && npx playwright test",
     "demo:scan": "npm run build && cd demo && node ../dist/cli.js scan",
+    "demo:check": "node scripts/check-demo-scan.ts",
     "shop": "node demo/shop/server.ts"
   },
   "peerDependencies": { "@playwright/test": ">=1.45.0" },

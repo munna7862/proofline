@@ -21,6 +21,7 @@ Users change one import and add one reporter. Nothing in their app changes.
 | Everything that must pass before a commit | `npm run verify` |
 | Demo suite with coverage report | `npm run demo` |
 | Demo fault check | `npm run demo:scan` |
+| Real runner vs ground truth (after demo + demo:scan) | `npm run demo:check` |
 | Run the demo shop by hand | `npm run shop` then open http://localhost:4173 |
 
 ## Map

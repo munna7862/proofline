@@ -13,12 +13,12 @@
 import { parseArgs } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { join, relative } from 'node:path';
+import { join } from 'node:path';
 import { aggregateCoverage } from './coverage/aggregate.ts';
 import { judgeMutant, planMutants, summarizeProof } from './proof/plan.ts';
 import { DEFAULT_OPERATORS, OPERATORS } from './proof/operators.ts';
 import { loadSummaries, writeReport } from './report/write.ts';
-import { paths, readJsonDir, resetDir } from './util/store.ts';
+import { displayPath, paths, readJsonDir, resetDir } from './util/store.ts';
 import type { MutantHitRecord, MutantResult, OperatorId, TestCoverageRecord, TestNetworkRecord } from './types.ts';
 
 const argv = process.argv.slice(2);
@@ -54,7 +54,7 @@ function cmdReport(): void {
   const records = readJsonDir<TestCoverageRecord>(paths.coverage);
   const coverage = records.length ? aggregateCoverage(records) : undefined;
   const file = writeReport({ coverage });
-  console.log(`Report: ${relative(process.cwd(), file)}`);
+  console.log(`Report: ${displayPath(file)}`);
 }
 
 function cmdScan(): void {
@@ -109,7 +109,7 @@ function cmdScan(): void {
   const proof = summarizeProof(results);
   const file = writeReport({ proof });
   console.log(`3/3 Fault check ${Math.round(proof.score)}%: ${proof.killed} caught, ${proof.survived} slipped through.`);
-  console.log(`Report: ${relative(process.cwd(), file)}`);
+  console.log(`Report: ${displayPath(file)}`);
   if (values['min-proof'] && proof.score < Number(values['min-proof'])) {
     console.error(`Fault check ${proof.score}% is below --min-proof ${values['min-proof']}`);
     process.exit(1);
