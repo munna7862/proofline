@@ -30,12 +30,12 @@
 - [ ] **S1-T5 Validation kit (2 h)**
   Screenshot the demo report (desktop). Create a free waitlist form (Google Forms or Tally). Send 10 DMs using docs/GO_TO_MARKET.md template A. Log replies in STATUS.md.
 
-- [ ] **S1-T6 First real-world trial (3 h)**
+- [x] **S1-T6 First real-world trial (3 h)**
   Pick a public repo with a Playwright suite and a real backend. Add the import + reporter in a local branch, run coverage, then `proofline scan --max-mutants 20`. Log every wrong classification in STATUS.md as a Sprint 2 candidate. Do not publish findings yet.
   Prompt:
   > I cloned <repo>. Add Proofline the way docs say (change the test import, add the reporter) on a local branch only. Run coverage, then npx proofline scan --max-mutants 20. Make a table of anything that looks misclassified, with evidence, and add it to docs/STATUS.md under "Sprint 2 candidates".
 
-- [ ] **S1-T7 Retro and plan Sprint 2 (1 h)**
+- [x] **S1-T7 Retro and plan Sprint 2 (1 h)**
   `/plan-sprint` (Claude Code) or the plan-sprint workflow (Antigravity).
 
 ## Risks this sprint
