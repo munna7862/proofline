@@ -14,6 +14,8 @@ interface GroundTruth {
   reachedByUrl?: string[];
   /** Exact scored element keys per view: no phantoms (busy labels, file names), no duplicates. */
   elements?: Record<string, string[]>;
+  /** Exact tested element keys per view, for keys that appear on more than one view. */
+  testedIn?: Record<string, string[]>;
   /** Elements that must be "not applicable: never enabled", outside the score. */
   neverEnabled?: string[];
   proof: Record<string, Record<string, string>>;
@@ -51,6 +53,14 @@ export function compareWithGroundTruth(
       const got = (v?.elements ?? []).map((e) => e.key).sort();
       const want = [...keys].sort();
       if (got.join('\n') !== want.join('\n')) failures.push(`coverage: ${view} elements expected [${want.join(', ')}], got [${got.join(', ')}]`);
+    }
+  }
+  if (coverage && expected.testedIn) {
+    for (const [view, keys] of Object.entries(expected.testedIn)) {
+      const v = coverage.views.find((x) => x.view === view);
+      const got = (v?.elements ?? []).filter((e) => e.tested).map((e) => e.key).sort();
+      const want = [...keys].sort();
+      if (got.join('\n') !== want.join('\n')) failures.push(`coverage: ${view} tested expected [${want.join(', ')}], got [${got.join(', ')}]`);
     }
   }
   if (coverage && expected.neverEnabled) {

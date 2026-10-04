@@ -6,7 +6,8 @@
  * that changes server state, a search box, a newsletter form and footer links,
  * plus per-user profile pages and a note addressed by a cuid (view normalization),
  * an account endpoint that answers 401 to guests (already failing in baseline),
- * and an avatar upload whose button reads "Processing..." while disabled (no phantom elements).
+ * an avatar upload whose button reads "Processing..." while disabled (no phantom elements),
+ * and a help center whose old view lingers after a client-side route change (no route bleed).
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
  */
@@ -107,6 +108,34 @@ form.addEventListener('submit', async (e) => {
 </script>
 </body></html>`;
 
+/** How long the old help view stays mounted after the route change: longer than the agent's 250 ms scan debounce. */
+const LEAVE_MS = 400;
+
+// Help center: a client-side route change (pushState) where the old view's button stays
+// mounted for a moment after the URL changed, like an exit animation or a framework that
+// swaps routes late. "Open FAQ" must belong to /help only; "Help home" is shared by both views.
+const HELP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Help</title></head><body>
+<nav><a href="/help" id="help-home">Help home</a></nav>
+<main id="help"></main>
+<script>
+const main = document.getElementById('help');
+function render() {
+  if (location.pathname === '/help/faq') {
+    const faq = document.createElement('section');
+    faq.innerHTML = '<h1>FAQ</h1><button id="helpful">Was this helpful?</button> <span id="thanks"></span>';
+    faq.querySelector('#helpful').addEventListener('click', () => { document.getElementById('thanks').textContent = 'Thanks'; });
+    const old = main.firstElementChild;
+    main.appendChild(faq);
+    if (old) setTimeout(() => old.remove(), ${LEAVE_MS});
+    return;
+  }
+  main.innerHTML = '<section><h1>Help</h1><button id="open-faq">Open FAQ</button></section>';
+  main.querySelector('#open-faq').addEventListener('click', () => { history.pushState(null, '', '/help/faq'); render(); });
+}
+render();
+</script>
+</body></html>`;
+
 /** How long the avatar upload takes: long enough for Proofline to see the busy button. */
 const UPLOAD_DELAY_MS = 800;
 
@@ -155,6 +184,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/about') return res.end(simplePage('About us'));
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
+    if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
     // Notes are addressed by a cuid, as in Prisma-backed apps.

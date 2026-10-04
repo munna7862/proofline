@@ -9,6 +9,8 @@
  *    so the app's own programmatic el.click() calls do not count as "tested".
  *    One exception: input/change on <input type=file>. Playwright's setInputFiles
  *    dispatches those untrusted, and apps rarely fire them on file inputs themselves.
+ *  - Its only globals on the app's window are __prooflineInstalled and __prooflineFlush
+ *    (the collector's end-of-test scan).
  */
 
 export interface AgentOptions {
@@ -202,11 +204,39 @@ export function proofAgent(opts: AgentOptions): void {
   // key -> 'enabled' | 'disabled'. A key first seen disabled is sent again once it is seen enabled.
   const seenPerView: Record<string, Record<string, string>> = {};
 
-  const scan = () => {
+  // Route-transition bleed: after a client-side route change, the old view often stays mounted
+  // for a moment (exit animations, late route swaps). Elements already on the page when the view
+  // changed are recorded under the new view only once they are still there HOLD_MS later (the
+  // end-of-test flush waits for that too). Shared layout (nav, header) survives; leftovers do not.
+  const HOLD_MS = 600;
+  let currentView = '';
+  let carried: WeakSet<Element> = new WeakSet();
+  let changedAt = 0;
+
+  const onUrlChange = () => {
+    const view = viewOf(location.href);
+    emit({ type: 'view', view, url: location.href });
+    if (view !== currentView) {
+      currentView = view;
+      carried = new WeakSet();
+      try {
+        document.querySelectorAll(opts.interactiveSelector).forEach((el) => carried.add(el));
+      } catch {
+        /* never break the app */
+      }
+      changedAt = Date.now();
+      setTimeout(scheduleScan, HOLD_MS);
+    }
+    scheduleScan();
+  };
+
+  const scan = (final = false) => {
     const view = viewOf(location.href);
     const seen = (seenPerView[view] = seenPerView[view] || {});
     const fresh: any[] = [];
+    const holding = !final && Date.now() - changedAt < HOLD_MS;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
+      if (holding && carried.has(el)) return;
       if (!isVisible(el)) return;
       const d = describe(el);
       const state = d.disabled ? 'disabled' : 'enabled';
@@ -239,7 +269,18 @@ export function proofAgent(opts: AgentOptions): void {
     const el = target.closest(opts.interactiveSelector);
     if (!el) return;
     const d = describe(el);
-    emit({ type: 'interaction', view: viewOf(location.href), key: d.key, event: ev.type });
+    const view = viewOf(location.href);
+    // The element the test just used is live in this view (even one held after a route change):
+    // record it now, before the test can navigate away ahead of the next scan, so every
+    // interaction has an inventory entry.
+    carried.delete(el);
+    const seen = (seenPerView[view] = seenPerView[view] || {});
+    const state = d.disabled ? 'disabled' : 'enabled';
+    if (seen[d.key] !== 'enabled' && seen[d.key] !== state) {
+      seen[d.key] = state;
+      emit({ type: 'inventory', view, elements: [d] });
+    }
+    emit({ type: 'interaction', view, key: d.key, event: ev.type });
     scheduleScan();
   };
 
@@ -247,8 +288,25 @@ export function proofAgent(opts: AgentOptions): void {
     document.addEventListener(t, onEvent, true),
   );
 
+  // Called by the collector when the test ends. If a route change is still on hold, wait it
+  // out first (at most HOLD_MS) so the old view's leftovers can unmount; whatever is still on
+  // the page then belongs to the current view.
+  w.__prooflineFlush = () =>
+    new Promise<void>((resolve) => {
+      const wait = Math.max(0, Math.min(HOLD_MS, changedAt + HOLD_MS - Date.now()));
+      setTimeout(() => {
+        try {
+          scan(true);
+        } catch {
+          /* never break the app */
+        }
+        resolve();
+      }, wait);
+    });
+
   const start = () => {
-    emit({ type: 'view', view: viewOf(location.href), url: location.href });
+    currentView = viewOf(location.href);
+    emit({ type: 'view', view: currentView, url: location.href });
     scan();
     new MutationObserver(scheduleScan).observe(document.documentElement, {
       subtree: true,
@@ -263,17 +321,13 @@ export function proofAgent(opts: AgentOptions): void {
     const original = history[method];
     history[method] = function (this: History, ...args: any[]) {
       const result = (original as any).apply(this, args);
-      emit({ type: 'view', view: viewOf(location.href), url: location.href });
-      scheduleScan();
+      onUrlChange();
       return result;
     } as any;
   };
   wrapHistory('pushState');
   wrapHistory('replaceState');
-  window.addEventListener('popstate', () => {
-    emit({ type: 'view', view: viewOf(location.href), url: location.href });
-    scheduleScan();
-  });
+  window.addEventListener('popstate', onUrlChange);
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
