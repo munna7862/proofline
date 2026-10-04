@@ -16,7 +16,28 @@
 export interface AgentOptions {
   bindingName: string;
   interactiveSelector: string;
+  /** Elements inside a match are never inventoried or counted (dev-only overlays). */
+  ignoreSelector: string;
 }
+
+/**
+ * Dev-only overlays that render inside the app's page but are not part of the app under test.
+ * Markers read from each package's source:
+ *  - TanStack Devtools (@tanstack/devtools 0.10): portal root data-testid="tanstack_devtools",
+ *    main panel id="tanstack_devtools". react-router-devtools 6 renders inside it as a plugin.
+ *  - react-router-devtools standalone: class "react-router-dev-tools",
+ *    data-testid "react-router-devtools-main-panel" / "react-router-devtools-trigger".
+ *  - TanStack Query devtools (@tanstack/query-devtools 5): classes "tsqd-open-btn-container"
+ *    (floating button) and "tsqd-main-panel" (panel).
+ */
+export const DEVTOOLS_ROOTS = [
+  '[data-testid="tanstack_devtools"]',
+  '#tanstack_devtools',
+  '.react-router-dev-tools',
+  '[data-testid^="react-router-devtools"]',
+  '.tsqd-open-btn-container',
+  '.tsqd-main-panel',
+].join(',');
 
 export const INTERACTIVE_SELECTOR = [
   'a[href]',
@@ -156,8 +177,10 @@ export function proofAgent(opts: AgentOptions): void {
     let cur: Element | null = el;
     while (cur && cur.nodeType === 1 && parts.length < 4) {
       let part = cur.tagName.toLowerCase();
-      if (cur.id) {
-        parts.unshift(part + '#' + cur.id);
+      // getAttribute, not .id: a form with <input name="id"> makes form.id that input.
+      const id = cur.getAttribute('id');
+      if (id) {
+        parts.unshift(part + '#' + id);
         break;
       }
       const cls = (cur.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)[0];
@@ -201,6 +224,16 @@ export function proofAgent(opts: AgentOptions): void {
     return el.getClientRects().length > 0;
   };
 
+  // Inside a dev-only overlay (DEVTOOLS_ROOTS): not part of the app under test.
+  const isIgnored = (el: Element) => {
+    if (!opts.ignoreSelector) return false;
+    try {
+      return !!el.closest(opts.ignoreSelector);
+    } catch {
+      return false;
+    }
+  };
+
   // key -> 'enabled' | 'disabled'. A key first seen disabled is sent again once it is seen enabled.
   const seenPerView: Record<string, Record<string, string>> = {};
 
@@ -237,6 +270,7 @@ export function proofAgent(opts: AgentOptions): void {
     const holding = !final && Date.now() - changedAt < HOLD_MS;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
+      if (isIgnored(el)) return;
       if (!isVisible(el)) return;
       const d = describe(el);
       const state = d.disabled ? 'disabled' : 'enabled';
@@ -267,7 +301,7 @@ export function proofAgent(opts: AgentOptions): void {
     const target = ev.target as Element | null;
     if (!target || typeof (target as any).closest !== 'function') return;
     const el = target.closest(opts.interactiveSelector);
-    if (!el) return;
+    if (!el || isIgnored(el)) return;
     const d = describe(el);
     const view = viewOf(location.href);
     // The element the test just used is live in this view (even one held after a route change):

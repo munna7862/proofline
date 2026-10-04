@@ -27,7 +27,7 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Add "prepack": "npm run build" to package.json scripts. Delete dist/, run npm pack, and confirm the tarball contains a freshly built dist/cli.js. Delete the tarball. Run npm run verify and paste the summary line.
 
-- [ ] **S3-T1 Devtools overlays are not app elements; fix the element path (2 h, needs approval: inventory rule)**
+- [x] **S3-T1 Devtools overlays are not app elements; fix the element path (2 h, needs approval: inventory rule)**
   S3-1: 8 of 20 epic-stack spot-check rows were TanStack/React Router devtools buttons, about 10 per view, captured or not depending on timing (`/signup` 19 vs 10 elements between runs). Folds in S3-8: `<input name="id">` clobbers `form.id`, so paths read `form#[object HTMLInputElement]`.
   Accept:
   - The agent skips any element whose ancestor matches the devtools root list (one constant in `src/page/agent.ts`, commented with where each marker comes from).
