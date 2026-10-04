@@ -16,6 +16,8 @@ interface GroundTruth {
   elements?: Record<string, string[]>;
   /** Exact tested element keys per view, for keys that appear on more than one view. */
   testedIn?: Record<string, string[]>;
+  /** Exact element path per view and key (paths are for humans; they must read right). */
+  paths?: Record<string, Record<string, string>>;
   /** Elements that must be "not applicable: never enabled", outside the score. */
   neverEnabled?: string[];
   proof: Record<string, Record<string, string>>;
@@ -61,6 +63,15 @@ export function compareWithGroundTruth(
       const got = (v?.elements ?? []).filter((e) => e.tested).map((e) => e.key).sort();
       const want = [...keys].sort();
       if (got.join('\n') !== want.join('\n')) failures.push(`coverage: ${view} tested expected [${want.join(', ')}], got [${got.join(', ')}]`);
+    }
+  }
+  if (coverage && expected.paths) {
+    for (const [view, byKey] of Object.entries(expected.paths)) {
+      const v = coverage.views.find((x) => x.view === view);
+      for (const [key, path] of Object.entries(byKey)) {
+        const got = v?.elements.find((e) => e.key === key)?.path;
+        if (got !== path) failures.push(`coverage: ${view} "${key}" path expected "${path}", got "${got}"`);
+      }
     }
   }
   if (coverage && expected.neverEnabled) {

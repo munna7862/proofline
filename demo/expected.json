@@ -12,6 +12,7 @@
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"]
   },
   "testedIn": {"/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
+  "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},
   "neverEnabled": ["button|Processing...|"],
   "proof": {
     "GET /api/products": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed"},

@@ -1,5 +1,5 @@
 import type { BrowserContext } from 'playwright-core';
-import { INTERACTIVE_SELECTOR, proofAgent } from '../page/agent.ts';
+import { DEVTOOLS_ROOTS, INTERACTIVE_SELECTOR, proofAgent } from '../page/agent.ts';
 import type { AgentMessage, ElementInfo, TestCoverageRecord } from '../types.ts';
 
 export const BINDING_NAME = '__proofline_emit';
@@ -48,6 +48,7 @@ export async function attachCoverage(context: BrowserContext, recorder: Coverage
   await context.addInitScript(proofAgent, {
     bindingName: BINDING_NAME,
     interactiveSelector: INTERACTIVE_SELECTOR,
+    ignoreSelector: DEVTOOLS_ROOTS,
   });
 }
 

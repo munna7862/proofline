@@ -114,16 +114,22 @@ const LEAVE_MS = 400;
 // Help center: a client-side route change (pushState) where the old view's button stays
 // mounted for a moment after the URL changed, like an exit animation or a framework that
 // swaps routes late. "Open FAQ" must belong to /help only; "Help home" is shared by both views.
+// It also carries dev-only overlays (fake TanStack, React Router and React Query devtools roots,
+// with the real packages' root markers): their 3 buttons are never app elements. The feedback form
+// has <input name="id">, which makes form.id that input: element paths must still read form#feedback.
 const HELP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Help</title></head><body>
 <nav><a href="/help" id="help-home">Help home</a></nav>
 <main id="help"></main>
+<div><div data-testid="tanstack_devtools"><button aria-label="Open TanStack Devtools"></button></div></div>
+<div class="react-router-dev-tools"><button>Routes</button></div>
+<div class="tsqd-open-btn-container"><button aria-label="Open Tanstack query devtools"></button></div>
 <script>
 const main = document.getElementById('help');
 function render() {
   if (location.pathname === '/help/faq') {
     const faq = document.createElement('section');
-    faq.innerHTML = '<h1>FAQ</h1><button id="helpful">Was this helpful?</button> <span id="thanks"></span>';
-    faq.querySelector('#helpful').addEventListener('click', () => { document.getElementById('thanks').textContent = 'Thanks'; });
+    faq.innerHTML = '<h1>FAQ</h1><form id="feedback"><input type="hidden" name="id" value="faq"><button type="button" class="helpful">Was this helpful?</button></form> <span id="thanks"></span>';
+    faq.querySelector('.helpful').addEventListener('click', () => { document.getElementById('thanks').textContent = 'Thanks'; });
     const old = main.firstElementChild;
     main.appendChild(faq);
     if (old) setTimeout(() => old.remove(), ${LEAVE_MS});
