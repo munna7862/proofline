@@ -63,13 +63,14 @@ S2-T1: yes, views only, minimum 3 values. S2-T2: option A. S2-T3: yes. S2-T4: ye
   Prompt:
   > Read AGENTS.md and the founder's decision for S2-T4 in docs/sprints/SPRINT_02.md. Record the baseline status per endpoint in src/proof/inject.ts (status code only). In src/proof/plan.ts, mark http-500 and network-fail not-applicable with reason "already failing in baseline" when every baseline status for the endpoint is >= 400. Make the CLI print "n/a (0 judged)" when nothing was judged. Add a demo endpoint that returns 401 in baseline, ground truth in demo/expected.json, and unit tests. Run npm run calibrate, npm run demo:check and npm run verify.
 
-- [ ] **S2-T5 Sprint demo: re-run both trials, before/after (1.5 h)**
+- [x] **S2-T5 Sprint demo: re-run both trials, before/after (1.5 h)**
   Pack a fresh tarball, reinstall in both trial branches, run coverage twice and `npx proofline scan --max-mutants 20` once per suite (start the buggy-books scan first; it takes about 45 min of machine time).
   Accept:
   - STATUS.md gets a before/after table per suite: coverage % and denominator (both runs), caught / slipped / n/a / not reached.
   - Expected direction: buggy-books coverage drops from 75% toward the interaction-only figure; epic-stack denominator identical across runs; buggy-books `POST /api/auth/refresh` faults move to n/a.
   - 20 elements per suite spot-checked by hand, at least 19 correct; misses logged as Sprint 3 candidates.
   - Nothing published; trial branches stay local.
+  - **Result (2026-10-04):** buggy-books met every check (34% coverage, refresh faults n/a, spot-check 20/20). epic-stack did not: denominator 480 vs 468 between identical runs, spot-check 9/20 (devtools overlays, route-transition bleed, toasts). Details and Sprint 3 candidates S3-1 to S3-11 in docs/STATUS.md.
   Prompt:
   > Run npm pack in C:\Workspace\proofline and install the tarball in both repos under C:\Workspace\proofline-trials on branch proofline-trial. Run each suite's coverage twice and npx proofline scan --max-mutants 20 once. Compare with the S1-T6 numbers in docs/STATUS.md and add a before/after table. Pick 20 elements per suite from the report and check each by reading the tests; list any misclassification as a Sprint 3 candidate. Do not push or publish anything.
 
