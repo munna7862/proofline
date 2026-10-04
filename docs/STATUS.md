@@ -23,6 +23,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-10-03 S2-T3 done: no phantom elements from busy states and form values (founder approved). The page agent names form fields (inputs other than submit/button/reset/image, textarea, select) by label, then `name`/`id`, then placeholder, never by value, so `C:\fakepath\...` and typed text no longer become elements. Elements seen only while `disabled` or inside `aria-busy="true"` are sent flagged; the collector and aggregation keep them only if no test ever saw them enabled or touched them, and list them per view as "Not applicable: never enabled", outside the score (HTML report, Markdown, reporter line). Demo: `/settings/avatar` with an unlabelled file input and an Upload button that reads "Processing..." while `POST /api/avatar` runs (800 ms); ground truth gains an exact element list for that view and a `neverEnabled` list. The old agent fails it with exactly the buggy-books phantoms (`button|Processing...|`, `textbox|C:\fakepath\avatar.png|`, `textbox||`). Numbers move because of the new page only: +2 scored elements (Upload tested, file input untested), +2 caught faults (500 and network failure on the upload); existing elements and faults unchanged. Real runner (`demo:check`) matches. Found: Playwright's `setInputFiles` fires untrusted input/change events, so a filled file input never counts as tested (decision requested in SPRINT_02.md). Verify: `UI coverage 33.3% (4/12) | Fault check 92.9% (13 caught, 1 slipped, 3 n/a)` (was 30%, 3/10; 11 caught), 30/30 unit tests.
 - 2026-10-03 S2-T3 follow-up done (founder approved): file inputs count as tested on untrusted input/change, because Playwright's `setInputFiles` dispatches them untrusted; all other elements still need trusted events. Demo `textbox|avatar|` moves to tested in ground truth. Real runner matches. Verify: `UI coverage 41.7% (5/12) | Fault check 92.9% (13 caught, 1 slipped, 3 n/a)` (was 33.3%, 4/12), 30/30 unit tests.
 - 2026-10-03 S2-T4 done (founder approved): the baseline recorder keeps each endpoint's HTTP status codes (status only, never bodies). When every baseline status of an endpoint (passing tests only) is 400 or above, `http-500` and `network-fail` are planned as "not applicable: already failing in baseline (401)" and never run; mixed or unknown-status endpoints are still faulted, body faults still run. The HTML report and Markdown list these faults with the reason; the score card and Markdown read "n/a" and the CLI prints `Fault check n/a (0 judged)` when nothing was judged. Demo: the home page calls `GET /api/account`, which answers 401 to guests; ground truth has both failure faults as already failing and all five as n/a. Real runner matches. Verify: `UI coverage 41.7% (5/12) | Fault check 92.9% (13 caught, 1 slipped, 8 n/a)` (was 3 n/a; the 5 new n/a are this endpoint). Sprint 3 candidate: body faults on an error body (`{ "error": "..." }`) still run and can "slip".
+- 2026-10-04 S2-T5 done: both trials re-run from a fresh `npm pack` tarball (local branches only, nothing pushed or published). Results, spot-checks and Sprint 3 candidates are in "Sprint 2 demo" below. buggy-books coverage 75% → 34% (45/133), spot-check 20/20, the two refresh faults move to n/a. epic-stack: the gap between identical runs shrinks from 126 to 12 (480 vs 468) but is not zero, and the spot-check is 9/20, below the 19/20 Phase 1 bar (11 rows should not be in the denominator; tested/untested was right on all 20). Two scan crashes found by the re-run and fixed on this branch, each with a regression test: ENOBUFS when the web server logs more than 1 MB (output was piped and never read), and a crash when re-rendering a coverage summary left on disk by an older Proofline. Verify: `UI coverage 41.7% (5/12) | Fault check 92.9% (13 caught, 1 slipped, 8 n/a)`, 38/38 unit tests.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):
@@ -41,6 +42,61 @@ From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranke
 | 10 | Small items. | Infrastructure endpoints (`/socket.io` polling, the suite's `/api/test/*` backdoors) are fault targets. "No coverage recorded. Did your tests import…" also prints when every test failed to launch the browser. CLI prints "Fault check 0%" when 0 faults were judged (should be n/a). README should show `reporter: [['html'], ['proofline/reporter']]` for configs that use a string reporter. Git Bash rewrites `--include /notes` into a Windows path; docs should say to drop the leading slash. | Default excludes + config; better messages; docs. |
 
 - `replay` re-runs every test that hit the endpoint; it could default to the survivors only (the tests that stayed green), which is what the user wants to watch.
+
+## Sprint 2 demo: trial re-run, before/after (S2-T5, 2026-10-04)
+Same repos, branches and two-line integration as S1-T6; Proofline from a fresh `npm pack` tarball of `main` plus the two crash fixes on this branch. Raw logs and summaries are in `C:\Workspace\proofline-trials\s2-results` and `*-s2*.log` (local only).
+How it was run: buggy-books with `--project=chromium`, as S1 (setup + 54 UI tests; the config has 6 browser projects). epic-stack coverage with `--workers=1`: with 4 workers, 7–8 of 24 tests failed today on dev-server `page.goto` timeouts. A control run with `PROOFLINE_MODE=off` failed the same 7, so Proofline did not cause them, but different tests failed in each run, so those runs could not test whether the denominator is stable. Scans used the default 2 workers, `--max-mutants 20`. Both scans planned the same 20 faults as S1, so scan rows compare like for like.
+
+**buggy-books** (Express + React, 55 tests)
+
+| | S1 (2026-10-03) | S2 run 1 | S2 run 2 |
+|---|---|---|---|
+| UI coverage | 75% (106/141) | **34% (45/133)**, 5 n/a never enabled | 32% (45/139), 2 n/a; 2 flaky tests passed on retry |
+| Fault check | 65%: 11 caught, 6 slipped, 3 n/a, 0 not reached (54/54 baseline) | **73.3%: 11 caught, 4 slipped, 5 n/a, 0 not reached** (52/54 baseline, 2 timeouts excluded) | |
+| Spot-check | not done | **20/20** | |
+
+- Coverage now matches the interaction-only figure found by hand in S1 (33.3%) (S2-T2). The 5 busy-state phantoms ("Authenticating...", "Processing..." and so on) and the `C:\fakepath\...` file-input names no longer enter the denominator (S2-T3).
+- Fault changes vs S1: `POST /api/auth/refresh` 500 and network failure, slipped → **n/a: already failing in baseline (401)** (S2-T4). UI_REF_02 is no longer the weakest test because of them.
+- `GET /api/books` "Wrong numbers" slipped → caught, but **the catch is false**. The only killer, "Complete Book Purchase", passed 3/3 with the fault and failed 1/3 without it (`Target page, context or browser has been closed`). The S1 true positive still holds: no catalog test checks prices.
+- `GET /api/cart` "Missing text" caught → slipped. A re-run with the fault kept all 33 tests green (10 received changed responses), so "slipped" reproduces. The S1 catch was most likely a flaky failure of the same kind (S1's raw records are gone).
+- Run-to-run denominator: 133 vs 139. The 6 extra rows are catalog elements recorded under `/cart` during the flaky run (route-transition bleed, candidate S3-2 below).
+
+**epic-stack** (React Router 7, 24 tests)
+
+| | S1 (4 workers) | S2 run 1 (1 worker) | S2 run 2 (1 worker) |
+|---|---|---|---|
+| UI coverage | 23% (127/554), then 25% (167/680) | **14% (65/480)**, 5 n/a | 14% (65/468), 3 n/a |
+| Tests passing | 21/24 both runs | 23/24 | 23/24 (same test fails) |
+| Views | 32 | 20 | 20 |
+| Fault check | 88%: 14 caught, 2 slipped, 4 not reached (23/24 baseline) | **92%: 11 caught, 1 slipped, 8 not reached** (23/24 baseline) | |
+| Spot-check | not done | **9/20** | |
+
+- Note ids (cuid) now normalize to `:id` and `/users/:param` is learned (S2-T1): 32 views → 20. The gap between identical runs went from 126 to 12, but the denominator is **not yet stable** (acceptance not met). The 12 rows come from devtools buttons and leftovers of the previous route that appear depending on timing, and from toasts.
+- Spot-check misses (11): 8 dev-mode devtools buttons (TanStack Devtools and React Router devtools: "Open in Editor", "Show Route Boundary", "Routes", "Network"), 1 toast named with faker data, 1 nameless `<span>` in `body`, and 1 route-transition bleed (the editor's "Add image" recorded on the note detail view after submit). The tested/untested state was right on all 20 rows.
+- Fault changes vs S1: callback 500, login 500 (GET and POST) and logout network failure went caught → not reached; `GET /onboarding.data` 500 went slipped → caught. Not investigated one by one; today's dev server was slower (see the timeouts above), and a test that times out before calling the endpoint counts as not reached. Per-user endpoints are not among the first 20 faults, so the S1 "4 of 4 not reached" finding is still unchecked.
+
+**Expected direction (sprint plan):**
+- buggy-books coverage drops toward interaction-only: **met** (34%/32% vs 33.3%).
+- epic-stack denominator identical across runs: **not met** (480 vs 468).
+- Refresh faults move to n/a: **met**.
+- Spot-check ≥ 19/20 per suite: **met on buggy-books (20/20), not met on epic-stack (9/20).**
+
+## Sprint 3 candidates (from S2-T5)
+Ranked by impact on trust in the numbers.
+
+| # | Problem | Evidence | Proposed fix |
+|---|---|---|---|
+| S3-1 | **Dev-only overlays are inventoried as app elements.** | epic-stack: 8 of 20 sampled rows are TanStack and React Router devtools buttons, about 10 per view; whether they are captured depends on timing (`/signup` 19 vs 10 elements between runs). | Default-exclude known devtools roots (TanStack devtools, react-router-devtools, React Query devtools) in the agent; `ignoreElements` in the Sprint 3 config as the escape hatch. Calibration: a demo page with a fake devtools root. |
+| S3-2 | **Route-transition bleed.** Elements of the previous route are recorded under the new URL. | epic-stack: note editor's "Add image" on the note detail view; onboarding's devtools entries under `/`. buggy-books: catalog elements under `/cart` in a run with flaky tests (+6 rows). | Capture only after the URL and DOM settle, or drop a snapshot when the URL changed during capture. |
+| S3-3 | **One flaky failure turns a slipped fault into "caught".** Needs approval (fault scoring). | buggy-books `GET /api/books` "Wrong numbers": the only killer passes 3/3 with the fault and fails 1/3 without it. The headline result S1 called a true positive was hidden as a catch. | Re-run each killer once without the fault (or repeat the baseline); if it also fails there, report the fault as "unstable: flaky test", outside the score, instead of caught. Deterministic and visible in the report. |
+| S3-4 | **Data-driven names.** Toasts and faker-named list links are elements whose keys change every run. | epic-stack: 26 faker-named links, all keys new each run; toast `Connected Your "Jayde_Huels" GitHub account…` is an element. | Never inventory toast/status regions (`ol.toaster`, `role=status`/`alert`). Group repeated items in one list (same DOM path, same role) into one "list item" element. |
+| S3-5 | **Learned `:param` does not reach deeper paths.** | epic-stack: `/users/<name>`, `/users/<name>/notes`, `/users/<name>/notes/new` stay verbatim when fewer than 3 tests share that exact shape, even though `/users/:param/notes/:id` was learned. | Once a position is learned under a parent, apply it to all descendants of that parent. Pure function, unit tests, demo case. |
+| S3-6 | **Views with inventory but no visitors.** | epic-stack: `/settings/profile/photo` (11 elements) and `/settings/profile/password` (12) have `visitedBy: []` but count in the score. | Find why the visit is not recorded (likely client-side navigation inside a dialog route); either record the visit or keep such views out of the score. |
+| S3-7 | **"Reached by URL" note is inaccurate.** | The note appears when the destination was reached by clicking a *different* link to the same normalized view (14 buggy-books book links → `/books/:id`, epic-stack breadcrumb "Change Email"). The untested state is right; the wording is not. | Report copy: "Destination reached another way, this link never clicked". Needs approval (report). |
+| S3-8 | **DOM clobbering in the agent's element path.** | epic-stack edit form has `<input name="id">`, so `form.id` is an element: path reads `form#[object HTMLInputElement]` (display only, keys unaffected). | Use `getAttribute('id')` in the agent's path builder. |
+| S3-9 | **Never-enabled list depends on timing.** | buggy-books 5 vs 2, epic-stack 5 vs 3 between runs. Outside the score, but the list flickers. | Accept as is, or record a busy button under its enabled name when the same element is later seen enabled. |
+| S3-10 | **Summaries carry no schema version.** | The S2-T5 crash: an S1 `coverage-summary.json` on disk broke `scan` after all 20 faults had run. Fixed by filling missing fields on load. | Add a `schemaVersion` to both summaries; on mismatch, ignore the old file and say so. Needs architect (types.ts). |
+| S3-11 | **`npm pack` ships a stale `dist/`.** | The ENOBUFS fix was missing from the first S2-T5 tarball until `npm run build` was run by hand. | `"prepack": "npm run build"` (spun off as a separate task). |
 
 ## Not yet run
 - vscode-extension/ (Phase 4 skeleton).

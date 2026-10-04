@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { aggregateCoverage } from '../src/coverage/aggregate.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import { renderReport } from '../src/report/html.ts';
+import { upgradeCoverage } from '../src/report/write.ts';
 import type { TestCoverageRecord } from '../src/types.ts';
 
 const el = (role: string, name: string, href?: string) => ({ key: `${role}|${name}|`, tag: 'x', role, name, href, path: 'x' });
@@ -28,4 +29,16 @@ test('reports list never-enabled elements as not applicable, outside the score',
   assert.match(html, /Not applicable: never enabled/);
   assert.match(html, /0 of 1 interactive elements touched by 1 tests, 1 not applicable \(never enabled\)/);
   assert.match(renderMarkdown(c), /0 of 1 interactive elements touched by 1 tests, 1 not applicable \(never enabled\)/);
+});
+
+test('a coverage summary written before never-enabled existed still renders after an upgrade', () => {
+  const c = aggregateCoverage(recs);
+  const old = JSON.parse(JSON.stringify(c));
+  delete old.neverEnabled;
+  for (const v of old.views) delete v.neverEnabled;
+  assert.throws(() => renderReport({ project: 'p', coverage: old }));
+  const up = upgradeCoverage(old);
+  assert.deepEqual(up, JSON.parse(JSON.stringify(c)));
+  assert.match(renderReport({ project: 'p', coverage: up }), /About/);
+  assert.doesNotThrow(() => renderMarkdown(up));
 });

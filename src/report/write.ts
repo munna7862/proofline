@@ -13,7 +13,20 @@ function readIf<T>(file: string): T | undefined {
 }
 
 export function loadSummaries(): { coverage?: CoverageSummary; proof?: ProofSummary } {
-  return { coverage: readIf<CoverageSummary>(COVERAGE_FILE()), proof: readIf<ProofSummary>(PROOF_FILE()) };
+  const coverage = readIf<CoverageSummary>(COVERAGE_FILE());
+  return { coverage: coverage && upgradeCoverage(coverage), proof: readIf<ProofSummary>(PROOF_FILE()) };
+}
+
+/**
+ * Fills fields added after a summary was written, so a coverage summary left on disk by an
+ * older Proofline still renders when `scan` re-renders the combined report after an upgrade.
+ */
+export function upgradeCoverage(c: CoverageSummary): CoverageSummary {
+  return {
+    ...c,
+    neverEnabled: c.neverEnabled ?? 0,
+    views: c.views.map((v) => ({ ...v, neverEnabled: v.neverEnabled ?? [] })),
+  };
 }
 
 /** Save whichever summary changed, then re-render the combined report from both. */
