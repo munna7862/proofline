@@ -92,6 +92,18 @@ const tests: DemoTest[] = [
       await eventually(async () => page.getByRole('button', { name: 'Upload' }).isEnabled(), 'upload enabled again');
     },
   },
+  // demo/tests/help.spec.ts: the old view lingers after a client-side route change (no route bleed)
+  {
+    testId: 'h1', title: 'faq feedback is thanked', file: 'demo/tests/help.spec.ts', line: 11, start: '/help',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Open FAQ' }).click({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Was this helpful?' }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#thanks')) === 'Thanks', 'thanks');
+      // Still inside the agent's 600 ms hold: the click must count on /help/faq.
+      await page.getByRole('link', { name: 'Help home' }).click({ timeout: 2000 });
+      await eventually(async () => new URL(page.url()).pathname === '/help', 'back on help home');
+    },
+  },
 ];
 
 async function runTest(ctx: BrowserContext, t: DemoTest): Promise<string> {

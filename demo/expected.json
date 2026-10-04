@@ -2,11 +2,16 @@
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
-    "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|"]
+    "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar"],
-  "elements": {"/settings/avatar": ["button|Upload|", "textbox|avatar|"]},
+  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/help", "/help/faq"],
+  "elements": {
+    "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
+    "/help": ["button|Open FAQ|", "link|Help home|"],
+    "/help/faq": ["button|Was this helpful?|", "link|Help home|"]
+  },
+  "testedIn": {"/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
   "neverEnabled": ["button|Processing...|"],
   "proof": {
     "GET /api/products": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed"},

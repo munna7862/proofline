@@ -51,9 +51,26 @@ export async function attachCoverage(context: BrowserContext, recorder: Coverage
   });
 }
 
-/** Give the agent a moment to flush debounced scans before the context closes. */
+/** The agent's route-change hold (600 ms) plus margin. */
+const FLUSH_TIMEOUT_MS = 1000;
+
+/**
+ * Before the context closes: ask the agent for a final scan (elements it was still holding
+ * after a route change count if they are on the page now), then give it a moment to deliver.
+ */
 export async function flushCoverage(context: BrowserContext): Promise<void> {
   await Promise.all(
-    context.pages().map((p) => p.waitForTimeout(300).catch(() => {})),
+    context.pages().map(async (p) => {
+      // Bounded: a busy page or an open dialog must never turn a passing test into a teardown timeout.
+      await Promise.all(
+        p.frames().map((f) =>
+          Promise.race([
+            f.evaluate(() => (window as any).__prooflineFlush?.()).catch(() => {}),
+            new Promise((r) => setTimeout(r, FLUSH_TIMEOUT_MS).unref()),
+          ]),
+        ),
+      );
+      await p.waitForTimeout(300).catch(() => {});
+    }),
   );
 }

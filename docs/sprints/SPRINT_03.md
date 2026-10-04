@@ -37,13 +37,14 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Read AGENTS.md, the founder's decision for S3-T1 in docs/sprints/SPRINT_03.md and the header comment of src/page/agent.ts (it runs in the browser and cannot import). Add a DEVTOOLS_ROOTS constant (TanStack Devtools, TanStack Query devtools, react-router-devtools; check each package's root markers and cite them in a comment) and skip any element inside one at capture time. Change the path builder to read ids with getAttribute('id'). Add a demo page with a fake devtools root and a form containing <input name="id">, ground truth in demo/expected.json, and unit tests for any logic testable outside the browser. Run npm run calibrate (before/after summary line) and npm run verify.
 
-- [ ] **S3-T2 No route-transition bleed (2.5 h)**
+- [x] **S3-T2 No route-transition bleed (2.5 h)**
   S3-2: elements of the previous route are recorded under the new URL. epic-stack: the note editor's "Add image" on the note detail view after submit; buggy-books: +6 catalog rows under `/cart` in the flaky run (133 vs 139). This is a capture-timing bug, not a scoring rule.
   Accept:
   - A snapshot is discarded when the URL changed between the start and the end of the capture, and the agent captures again once the DOM has been quiet for the existing debounce after a URL change.
   - Demo: a client-side route change where the old view's button stays in the DOM for ~300 ms after `pushState`. Ground truth: that button belongs only to the old view.
   - Unit test for the "URL changed during capture" decision if it can live outside the agent; otherwise the calibration entry is the test.
   - `npm run calibrate` passes; `npm run demo` twice prints the same denominator.
+  - **Done 2026-10-04, different mechanism:** a capture cannot straddle a URL change (the scan is synchronous), so instead elements present at the route change are held 600 ms and recorded only if still there. Limit: leftovers that linger longer than 600 ms still bleed; S3-T5 checks the buggy-books `/cart` and epic-stack "Add image" cases. Also: interacted elements are recorded at once, so a view left within the scan debounce keeps the elements its test used.
   Prompt:
   > Read AGENTS.md and the header comment of src/page/agent.ts. Reproduce route-transition bleed in the demo: a client-side navigation where the previous view's button stays mounted for about 300 ms after pushState. Fix capture so a snapshot whose URL changed during capture is dropped and retaken after the DOM settles. Add ground truth in demo/expected.json. Run npm run calibrate (before/after summary line), npm run demo twice to confirm a stable denominator, and npm run verify.
 
