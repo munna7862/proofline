@@ -17,6 +17,7 @@
     "calibrate": "node scripts/calibrate.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run build",
     "verify": "npm run typecheck && npm test && npm run calibrate",
     "demo": "npm run build && cd demo && npx playwright test",
     "demo:scan": "npm run build && cd demo && node ../dist/cli.js scan",
