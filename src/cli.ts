@@ -40,11 +40,12 @@ function playwrightCommand(): { cmd: string; prefix: string[]; shell: boolean } 
 
 function runPlaywright(args: string[], env: Record<string, string>, inherit = false): number {
   const pw = playwrightCommand();
+  // Results come back through files, so output is never read. 'pipe' would buffer it and
+  // crash with ENOBUFS once a chatty webServer passes spawnSync's 1 MB limit.
   const res = spawnSync(pw.cmd, [...pw.prefix, 'test', ...args], {
-    stdio: inherit ? 'inherit' : 'pipe',
+    stdio: inherit ? 'inherit' : 'ignore',
     env: { ...process.env, ...env },
     shell: pw.shell,
-    encoding: 'utf8',
   });
   if (res.error) throw res.error;
   return res.status ?? 1;
