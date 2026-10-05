@@ -31,6 +31,10 @@ export interface AgentOptions {
  *    data-testid "react-router-devtools-main-panel" / "react-router-devtools-trigger".
  *  - TanStack Query devtools (@tanstack/query-devtools 5): classes "tsqd-open-btn-container"
  *    (floating button) and "tsqd-main-panel" (panel).
+ *  - Focus guards, invisible tabindex=0 sentinels that trap focus in a dialog or menu and are
+ *    not app elements: Radix (@radix-ui/react-focus-guards 1.1.3) sets data-radix-focus-guard;
+ *    Headless UI (@headlessui/react 2.2) renders data-headlessui-focus-guard; data-focus-guard
+ *    is the generic marker (react-focus-lock).
  */
 export const DEVTOOLS_ROOTS = [
   '[data-testid="tanstack_devtools"]',
@@ -39,6 +43,9 @@ export const DEVTOOLS_ROOTS = [
   '[data-testid^="react-router-devtools"]',
   '.tsqd-open-btn-container',
   '.tsqd-main-panel',
+  '[data-radix-focus-guard]',
+  '[data-headlessui-focus-guard]',
+  '[data-focus-guard]',
 ].join(',');
 
 /**
