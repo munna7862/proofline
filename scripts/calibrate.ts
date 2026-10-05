@@ -35,7 +35,7 @@ async function eventually(check: () => Promise<boolean>, what: string, timeout =
 }
 const textOf = (page: Page, sel: string) => page.locator(sel).first().textContent({ timeout: 500 });
 
-type DemoTest = TestRef & { start?: string; body: (page: Page) => Promise<void> };
+type DemoTest = TestRef & { start?: string; expectFail?: boolean; body: (page: Page) => Promise<void> };
 /** Invocations of the flaky tips test; reset before the normal run, like tips.spec.ts's counter file. */
 let tipRuns = 0;
 const tests: DemoTest[] = [
@@ -125,6 +125,13 @@ const tests: DemoTest[] = [
       if (n === 2) throw new Error('flaky: fails on its second invocation only (demo)');
     },
   },
+  // demo/tests/outage.spec.ts: fails after visiting a page nobody else visits (its coverage is not counted)
+  {
+    testId: 'o1', title: 'outage page shows recovery', file: 'demo/tests/outage.spec.ts', line: 10, start: '/outage', expectFail: true,
+    body: async (page) => {
+      await eventually(async () => (await textOf(page, 'h1')) === 'Recovered', 'recovery heading', 500);
+    },
+  },
 ];
 
 async function runTest(ctx: BrowserContext, t: DemoTest): Promise<string> {
@@ -160,7 +167,7 @@ async function main() {
       const { body, ...ref } = t;
       coverageRecords.push(cov.toRecord({ ...ref, status }));
       baseline.push({ ...ref, status, endpoints: net.endpoints() });
-      if (status !== 'passed') failures.push(`baseline: "${t.title}" should pass but ${status}`);
+      if (status !== 'passed' && !t.expectFail) failures.push(`baseline: "${t.title}" should pass but ${status}`);
     }
     const coverage = aggregateCoverage(coverageRecords);
 

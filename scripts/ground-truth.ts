@@ -8,6 +8,8 @@ import type { CoverageSummary, ProofSummary } from '../src/types.ts';
 
 interface GroundTruth {
   coverage: { untested: string[]; tested: string[] };
+  /** Tests whose failure keeps their coverage out of the summary. */
+  testsExcluded?: number;
   /** Exact set of view keys the coverage summary must contain. */
   views?: string[];
   /** Links that must be untested with reachedByUrl on every view they appear on. */
@@ -39,6 +41,9 @@ export function compareWithGroundTruth(
   proof: ProofSummary | undefined,
 ): string[] {
   const failures: string[] = [];
+  if (coverage && expected.testsExcluded !== undefined && coverage.testsExcluded !== expected.testsExcluded) {
+    failures.push(`coverage: testsExcluded expected ${expected.testsExcluded}, got ${coverage.testsExcluded}`);
+  }
   if (coverage && expected.views) {
     const got = coverage.views.map((v) => v.view).sort();
     const want = [...expected.views].sort();

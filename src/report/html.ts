@@ -193,6 +193,7 @@ export function renderReport(input: ReportInput): string {
           <p class="score-value">${pct(c.score)}</p>
           ${meter(c.score, 'cov')}
           <p class="muted">${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests${c.neverEnabled ? `, ${c.neverEnabled} not applicable (never enabled)` : ''}</p>
+          ${c.testsExcluded ? `<p class="muted">${c.testsExcluded} ${c.testsExcluded === 1 ? 'test' : 'tests'} failed; their coverage is not counted</p>` : ''}
         </div>`
       : '',
     p

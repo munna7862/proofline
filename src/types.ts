@@ -56,6 +56,8 @@ export interface ViewCoverage {
 export interface CoverageSummary {
   generatedAt: string;
   tests: number;
+  /** Tests that did not pass; their coverage is not counted. */
+  testsExcluded: number;
   score: number; // 0..100
   tested: number;
   total: number;

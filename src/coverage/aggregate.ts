@@ -148,7 +148,13 @@ export interface AggregateOptions {
  *  - Per-test path segments are merged into one view first (see learnViewParams).
  *  - 3+ sibling items of one list count as one element, "N seen" (see groupListItems).
  */
-export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOptions = {}): CoverageSummary {
+/** A record with no status (written by an older Proofline) still counts. */
+export const countsTowardCoverage = (rec: TestCoverageRecord) => rec.status === undefined || rec.status === 'passed';
+
+export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOptions = {}): CoverageSummary {
+  // Only passing tests count: a failed or timed-out test stops at a different step each run,
+  // so its partial coverage is not a stable fact about the suite (same rule as the fault check).
+  const input = all.filter(countsTowardCoverage);
   const learned = learnViewParams(input);
   const records = input.map((rec) => remapViews(rec, learned));
   const ignoreViews = new Set(opts.ignoreViews ?? []);
@@ -225,6 +231,7 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
   return {
     generatedAt: new Date().toISOString(),
     tests: records.length,
+    testsExcluded: all.length - input.length,
     score: total ? Math.round((tested / total) * 1000) / 10 : 0,
     tested,
     total,

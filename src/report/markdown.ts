@@ -8,6 +8,7 @@ export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
   if (c) {
     const na = c.neverEnabled ? `, ${c.neverEnabled} not applicable (never enabled)` : '';
     lines.push(`**UI coverage ${Math.round(c.score)}%** · ${c.tested} of ${c.total} interactive elements touched by ${c.tests} tests${na}`);
+    if (c.testsExcluded) lines.push('', `${c.testsExcluded} ${c.testsExcluded === 1 ? 'test' : 'tests'} failed; their coverage is not counted.`);
   }
   if (p) {
     const judged = p.killed + p.survived;

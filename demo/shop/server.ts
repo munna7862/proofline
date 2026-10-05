@@ -110,6 +110,11 @@ form.addEventListener('submit', async (e) => {
 </script>
 </body></html>`;
 
+// A page only the deliberately failing outage test visits. Its "Retry" button must stay out of coverage.
+const OUTAGE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Outage</title></head><body>
+<h1>Outage</h1><button id="retry">Retry</button>
+</body></html>`;
+
 /** How long the old help view stays mounted after the route change: longer than the agent's 250 ms scan debounce. */
 const LEAVE_MS = 400;
 
@@ -241,6 +246,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/help/tips') return res.end(TIPS_PAGE);
+    if (url.pathname === '/outage') return res.end(OUTAGE_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
     // Notes are addressed by a cuid, as in Prisma-backed apps.

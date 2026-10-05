@@ -39,7 +39,7 @@ export default class ProoflineReporter implements Reporter {
     const summary = aggregateCoverage(records, this.options);
     const file = writeReport({ coverage: summary });
     console.log(
-      `[proofline] UI coverage ${Math.round(summary.score)}% (${summary.tested}/${summary.total} elements${summary.neverEnabled ? `, ${summary.neverEnabled} not applicable` : ''}). Report: ${displayPath(file)}`,
+      `[proofline] UI coverage ${Math.round(summary.score)}% (${summary.tested}/${summary.total} elements${summary.neverEnabled ? `, ${summary.neverEnabled} not applicable` : ''}${summary.testsExcluded ? `; ${summary.testsExcluded} ${summary.testsExcluded === 1 ? 'test' : 'tests'} failed, their coverage is not counted` : ''}). Report: ${displayPath(file)}`,
     );
   }
 

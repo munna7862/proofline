@@ -40,7 +40,8 @@
 - Not applicable, never enabled = an element no test ever saw enabled (only `disabled` or inside `aria-busy="true"`, such as a "Processing..." label). Listed per view in the report, outside the score. Seen enabled once, or interacted with, it is scored.
 - Tested = a trusted click, double-click, context-menu, input or change event on it (or inside it). File inputs also count on untrusted input/change, because Playwright's `setInputFiles` dispatches those untrusted. Links count only when clicked; a link whose destination some test opened by URL stays untested and is marked "Destination visited by URL, link never clicked".
 - View = path with ids, uuids and hashes normalized (numbers and cuid/cuid2/nanoid/ulid shapes become `:id`); hash-router paths included. Per-test segments are learned at aggregation: when 3+ values under the same parent each come from a different single test and none is a link shared by 2+ tests, that segment becomes `:param` (`/users/:param`).
-- Score = tested / total, across all visited views.
+- Only passing tests count: a record whose status is set and is not `passed` adds no views, inventory or interactions (the rule the fault check already uses). A record with no status, from an older Proofline, still counts. `CoverageSummary.testsExcluded` holds the number, and the report, Markdown and reporter line say "N tests failed; their coverage is not counted".
+- Score = tested / total, across all visited views, from passing tests only.
 
 **Fault check**
 - Faults are planned only for endpoints that tests which PASSED the baseline called.

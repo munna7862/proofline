@@ -4,6 +4,7 @@
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
+  "testsExcluded": 1,
   "reachedByUrl": ["link|Back to shop|"],
   "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/help", "/help/faq", "/community"],
   "elements": {
