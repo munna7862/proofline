@@ -117,7 +117,8 @@ const LEAVE_MS = 400;
 // mounted for a moment after the URL changed, like an exit animation or a framework that
 // swaps routes late. "Open FAQ" must belong to /help only; "Help home" is shared by both views.
 // It also carries dev-only overlays (fake TanStack, React Router and React Query devtools roots,
-// with the real packages' root markers): their 3 buttons are never app elements. The feedback form
+// with the real packages' root markers): their 3 buttons are never app elements.
+// A Radix focus-guard span (invisible, tabindex=0) is not one either. The feedback form
 // has <input name="id">, which makes form.id that input: element paths must still read form#feedback.
 const HELP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Help</title></head><body>
 <nav><a href="/help" id="help-home">Help home</a></nav>
@@ -125,6 +126,7 @@ const HELP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><t
 <div><div data-testid="tanstack_devtools"><button aria-label="Open TanStack Devtools"></button></div></div>
 <div class="react-router-dev-tools"><button>Routes</button></div>
 <div class="tsqd-open-btn-container"><button aria-label="Open Tanstack query devtools"></button></div>
+<span data-radix-focus-guard tabindex="0" style="outline:none;opacity:0;position:fixed;pointer-events:none"></span>
 <script>
 const main = document.getElementById('help');
 function render() {

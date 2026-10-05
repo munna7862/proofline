@@ -42,7 +42,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
 
 ## Tasks
 
-- [ ] **S4-T0 Focus guards are not app elements (0.5 h)**
+- [x] **S4-T0 Focus guards are not app elements (0.5 h)**
   S4-7: a nameless `body > span` on epic-stack, Radix's invisible `tabindex=0` focus-guard. It was a spot-check miss in S2 and S3.
   Accept:
   - The agent's ignore list skips `[data-radix-focus-guard]`, `[data-focus-guard]` and Headless UI's focus guard. Each marker is checked in the package source and cited in a comment, as `DEVTOOLS_ROOTS` was.
