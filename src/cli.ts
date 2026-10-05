@@ -15,11 +15,11 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { aggregateCoverage } from './coverage/aggregate.ts';
-import { judgeMutant, plannedResult, planMutants, proofHeadline, summarizeProof } from './proof/plan.ts';
+import { applyRecheck, judgeMutant, plannedResult, planMutants, proofHeadline, recheckTargets, summarizeProof } from './proof/plan.ts';
 import { DEFAULT_OPERATORS, OPERATORS } from './proof/operators.ts';
 import { loadSummaries, writeReport } from './report/write.ts';
 import { displayPath, paths, readJsonDir, resetDir } from './util/store.ts';
-import type { MutantHitRecord, MutantResult, OperatorId, TestCoverageRecord, TestNetworkRecord } from './types.ts';
+import type { MutantHitRecord, MutantResult, OperatorId, TestCoverageRecord, TestNetworkRecord, TestRef } from './types.ts';
 
 const argv = process.argv.slice(2);
 const dashDash = argv.indexOf('--');
@@ -101,16 +101,22 @@ function cmdScan(): void {
       return;
     }
     const started = Date.now();
-    resetDir(paths.mutant(m.id));
-    const targets = [...new Set(m.tests.map((t) => `${t.file}:${t.line}`))];
-    runPlaywright(['--reporter=dot', '--retries=0', `--workers=${values.workers}`, ...passThrough, ...targets], {
-      PROOFLINE_MODE: 'mutant',
-      PROOFLINE_MUTANT: JSON.stringify(m),
-    });
-    const hits = readJsonDir<MutantHitRecord>(paths.mutant(m.id));
-    const result = judgeMutant(m, hits, Date.now() - started);
+    const runFault = (tests: TestRef[]) => {
+      resetDir(paths.mutant(m.id));
+      const targets = [...new Set(tests.map((t) => `${t.file}:${t.line}`))];
+      runPlaywright(['--reporter=dot', '--retries=0', `--workers=${values.workers}`, ...passThrough, ...targets], {
+        PROOFLINE_MODE: 'mutant',
+        PROOFLINE_MUTANT: JSON.stringify(m),
+      });
+      return readJsonDir<MutantHitRecord>(paths.mutant(m.id));
+    };
+    let result = judgeMutant(m, runFault(m.tests), 0);
+    // A catch by 1 or 2 tests is re-run once with the same fault: a flaky failure is not a catch.
+    const recheck = recheckTargets(result);
+    if (recheck.length) result = applyRecheck(result, runFault(recheck));
+    result = { ...result, durationMs: Date.now() - started };
     results.push(result);
-    console.log(`   [${i + 1}/${mutants.length}] ${m.method} ${path} ${OPERATORS[m.operator].label}: ${result.outcome}`);
+    console.log(`   [${i + 1}/${mutants.length}] ${m.method} ${path} ${OPERATORS[m.operator].label}: ${result.outcome}${result.outcome === 'unstable' ? ` (${result.reason})` : ''}`);
   });
 
   const proof = summarizeProof(results);

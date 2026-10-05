@@ -11,7 +11,7 @@ export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
   }
   if (p) {
     const judged = p.killed + p.survived;
-    const na = p.notApplicable ? `, ${p.notApplicable} not applicable` : '';
+    const na = (p.unstable ? `, ${p.unstable} unstable (flaky test)` : '') + (p.notApplicable ? `, ${p.notApplicable} not applicable` : '');
     lines.push(`**Fault check ${judged ? `${Math.round(p.score)}%` : 'n/a'}** · ${p.killed} of ${judged} injected faults caught${na}`);
   }
   lines.push('');
@@ -25,6 +25,16 @@ export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
       );
     }
     if (slipped.length > 10) lines.push('', `…and ${slipped.length - 10} more in the HTML report.`);
+    lines.push('');
+  }
+
+  const unstable = p?.results.filter((r) => r.outcome === 'unstable') ?? [];
+  if (unstable.length) {
+    lines.push('### Unstable: caught only by a flaky test', '', 'Outside the score. The test that failed with the fault passed when re-run with it.', '');
+    for (const r of unstable.slice(0, 5)) {
+      lines.push(`- \`${endpointLabel(r)}\` ${OPERATORS[r.mutant.operator].label}: ${r.reason}. Replay: \`npx proofline replay ${r.mutant.id}\``);
+    }
+    if (unstable.length > 5) lines.push(`- …and ${unstable.length - 5} more in the HTML report.`);
     lines.push('');
   }
 

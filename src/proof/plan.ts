@@ -110,9 +110,35 @@ export function judgeMutant(mutant: Mutant, hits: MutantHitRecord[], durationMs:
   };
 }
 
+/** A fault caught by this many tests or fewer has its killers re-run once to rule out a flaky catch. */
+export const RECHECK_MAX_KILLERS = 2;
+
+/**
+ * The tests to re-run once with the same fault (retries 0) before trusting a catch:
+ * the killers of a fault caught by 1 or 2 tests. Faults caught by 3+ tests are not
+ * re-checked (cost); every other outcome needs no re-run.
+ */
+export function recheckTargets(result: MutantResult): TestRef[] {
+  if (result.outcome !== 'killed' || result.killers.length > RECHECK_MAX_KILLERS) return [];
+  return result.killers;
+}
+
+/**
+ * Applies the re-run of the killers (founder rule S3-T4). If any killer passed with the same
+ * fault still active, the catch was a flaky failure: the fault is "unstable", outside the score.
+ * A re-run that recorded nothing (crash, no results) leaves the catch as it was.
+ */
+export function applyRecheck(result: MutantResult, rerun: MutantHitRecord[]): MutantResult {
+  const killerIds = new Set(recheckTargets(result).map((t) => t.testId));
+  const passed = rerun.filter((h) => killerIds.has(h.testId) && h.status === 'passed');
+  if (!passed.length) return result;
+  const names = [...new Set(passed.map((h) => `"${h.title}"`))].sort().join(', ');
+  return { ...result, outcome: 'unstable', reason: `flaky test: ${names} passed on re-run` };
+}
+
 /** One-line CLI result. A score over zero judged faults is meaningless, so it reads "n/a" instead of 0%. */
 export function proofHeadline(p: ProofSummary): string {
-  const na = p.notApplicable ? `, ${p.notApplicable} not applicable` : '';
+  const na = (p.unstable ? `, ${p.unstable} unstable` : '') + (p.notApplicable ? `, ${p.notApplicable} not applicable` : '');
   if (p.killed + p.survived === 0) return `Fault check n/a (0 judged)${na}.`;
   return `Fault check ${Math.round(p.score)}%: ${p.killed} caught, ${p.survived} slipped through${na}.`;
 }
@@ -152,6 +178,7 @@ export function summarizeProof(results: MutantResult[]): ProofSummary {
     score: killed + survived ? Math.round((killed / (killed + survived)) * 1000) / 10 : 0,
     killed,
     survived,
+    unstable: count('unstable'),
     notReached: count('not-reached'),
     notApplicable: count('not-applicable'),
     errors: count('error'),

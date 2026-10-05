@@ -100,12 +100,12 @@ export interface Mutant {
   notApplicable?: string;
 }
 
-export type MutantOutcome = 'killed' | 'survived' | 'not-reached' | 'not-applicable' | 'error';
+export type MutantOutcome = 'killed' | 'survived' | 'unstable' | 'not-reached' | 'not-applicable' | 'error';
 
 export interface MutantResult {
   mutant: Mutant;
   outcome: MutantOutcome;
-  /** Why the fault is not applicable; shown next to it in the report. */
+  /** Why the fault is not applicable or unstable; shown next to it in the report. */
   reason?: string;
   /** Tests that stayed green while the fault was active: the actionable list. */
   survivors: TestRef[];
@@ -126,6 +126,8 @@ export interface ProofSummary {
   score: number; // killed / (killed + survived), 0..100
   killed: number;
   survived: number;
+  /** Caught only by a test that passed when re-run with the same fault: flaky, outside the score. */
+  unstable: number;
   notReached: number;
   notApplicable: number;
   errors: number;

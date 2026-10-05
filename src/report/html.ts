@@ -36,6 +36,7 @@ export function endpointLabel(r: MutantResult): string {
 const OUTCOME_TEXT: Record<string, string> = {
   killed: 'Caught',
   survived: 'Slipped through',
+  unstable: 'Unstable: flaky test',
   'not-reached': 'Not reached',
   'not-applicable': 'Not applicable',
   error: 'Run error',
@@ -113,8 +114,8 @@ function coverageSection(c: CoverageSummary): string {
 }
 
 function proofSection(p: ProofSummary): string {
-  const order: Record<string, number> = { survived: 0, killed: 1, error: 2, 'not-reached': 3, 'not-applicable': 4 };
-  const shown = p.results.filter((r) => r.outcome === 'killed' || r.outcome === 'survived' || r.outcome === 'error');
+  const order: Record<string, number> = { survived: 0, killed: 1, unstable: 2, error: 3, 'not-reached': 4, 'not-applicable': 5 };
+  const shown = p.results.filter((r) => r.outcome === 'killed' || r.outcome === 'survived' || r.outcome === 'unstable' || r.outcome === 'error');
   // Faults the planner ruled out get their reason spelled out; the rest stay a one-line count.
   const ruledOut = p.results.filter((r) => r.outcome === 'not-applicable' && r.mutant.notApplicable);
   const skipped = p.results.length - shown.length - ruledOut.length;
@@ -133,7 +134,9 @@ function proofSection(p: ProofSummary): string {
           ? `<ul class="plain">${r.survivors.map((t) => `<li>${esc(t.title)} <span class="muted">${esc(t.file)}:${t.line}</span></li>`).join('')}</ul>`
           : r.outcome === 'killed'
             ? `<span class="muted">${r.killers.map((t) => esc(t.title)).join(', ')}</span>`
-            : '';
+            : r.outcome === 'unstable'
+              ? `<span class="muted">${esc(r.reason ?? '')}. Not counted in the score.</span>`
+              : '';
       return `<tr data-outcome="${r.outcome}">
         <td data-label="Endpoint"><code>${esc(endpointLabel(r))}</code></td>
         <td data-label="Fault">${esc(OPERATORS[r.mutant.operator].label)}</td>
@@ -151,6 +154,7 @@ function proofSection(p: ProofSummary): string {
       <button class="filter is-on" data-filter="all">All</button>
       <button class="filter" data-filter="survived">Slipped through (${p.survived})</button>
       <button class="filter" data-filter="killed">Caught (${p.killed})</button>
+      ${p.unstable ? `<button class="filter" data-filter="unstable">Unstable (${p.unstable})</button>` : ''}
     </div>
     <div class="table-wrap"><table>
       <thead><tr><th>Endpoint</th><th>Fault</th><th>Result</th><th>Tests</th><th>Replay</th></tr></thead>
@@ -196,7 +200,7 @@ export function renderReport(input: ReportInput): string {
           <p class="score-name">Fault check</p>
           <p class="score-value">${p.killed + p.survived ? pct(p.score) : 'n/a'}</p>
           ${meter(p.score, 'proof')}
-          <p class="muted">${p.killed} of ${p.killed + p.survived} injected faults caught${p.notReached ? `, ${p.notReached} not reached` : ''}${p.notApplicable ? `, ${p.notApplicable} not applicable` : ''}</p>
+          <p class="muted">${p.killed} of ${p.killed + p.survived} injected faults caught${p.unstable ? `, ${p.unstable} unstable (flaky test)` : ''}${p.notReached ? `, ${p.notReached} not reached` : ''}${p.notApplicable ? `, ${p.notApplicable} not applicable` : ''}</p>
         </div>`
       : '',
   ].join('');
@@ -259,7 +263,7 @@ tr:last-child td{border-bottom:0}
 .badge{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600;white-space:nowrap}
 .badge-killed{background:var(--good-bg);color:var(--good)}
 .badge-survived{background:var(--bad-bg);color:var(--bad)}
-.badge-not-reached,.badge-not-applicable,.badge-error{background:var(--warn-bg);color:var(--warn)}
+.badge-unstable,.badge-not-reached,.badge-not-applicable,.badge-error{background:var(--warn-bg);color:var(--warn)}
 .copy{border:1px dashed var(--line);background:transparent;color:var(--ink);border-radius:6px;padding:3px 8px;cursor:pointer}
 .copy.done{border-style:solid;border-color:var(--good);color:var(--good)}
 button:focus-visible{outline:2px solid var(--brand);outline-offset:2px}

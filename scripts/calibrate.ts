@@ -12,7 +12,7 @@ import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
 import { aggregateCoverage } from '../src/coverage/aggregate.ts';
 import { injectMutant, NetworkRecorder } from '../src/proof/inject.ts';
-import { judgeMutant, plannedResult, planMutants, summarizeProof } from '../src/proof/plan.ts';
+import { applyRecheck, judgeMutant, plannedResult, planMutants, recheckTargets, summarizeProof } from '../src/proof/plan.ts';
 import { renderReport } from '../src/report/html.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import { startShop } from '../demo/shop/server.ts';
@@ -36,6 +36,8 @@ async function eventually(check: () => Promise<boolean>, what: string, timeout =
 const textOf = (page: Page, sel: string) => page.locator(sel).first().textContent({ timeout: 500 });
 
 type DemoTest = TestRef & { start?: string; body: (page: Page) => Promise<void> };
+/** Invocations of the flaky tips test; reset before the normal run, like tips.spec.ts's counter file. */
+let tipRuns = 0;
 const tests: DemoTest[] = [
   {
     testId: 't1', title: 'shows products with prices', file: 'demo/tests/shop.spec.ts', line: 15,
@@ -114,6 +116,15 @@ const tests: DemoTest[] = [
       await eventually(async () => (await textOf(page, '#reading'))!.startsWith('Reading'), 'reading a post');
     },
   },
+  // demo/tests/tips.spec.ts: fails on its second invocation only (the first fault run on /api/tips)
+  {
+    testId: 'f1', title: 'tip of the day loads', file: 'demo/tests/tips.spec.ts', line: 30, start: '/help/tips',
+    body: async (page) => {
+      const n = ++tipRuns;
+      await eventually(async () => (await page.locator('#tip').getAttribute('data-state')) === 'ok', 'tip loaded');
+      if (n === 2) throw new Error('flaky: fails on its second invocation only (demo)');
+    },
+  },
 ];
 
 async function runTest(ctx: BrowserContext, t: DemoTest): Promise<string> {
@@ -136,6 +147,7 @@ async function main() {
     // ---- Phase A: normal run -> UI coverage + network baseline ----
     const coverageRecords: TestCoverageRecord[] = [];
     const baseline: TestNetworkRecord[] = [];
+    tipRuns = 0;
     for (const t of tests) {
       const ctx = await browser.newContext();
       const cov = new CoverageRecorder();
@@ -162,16 +174,22 @@ async function main() {
         continue;
       }
       const started = Date.now();
-      const hits: MutantHitRecord[] = [];
-      for (const ref of m.tests) {
-        const t = tests.find((x) => x.testId === ref.testId)!;
-        const ctx = await browser.newContext();
-        const state = await injectMutant(ctx, m);
-        const status = await runTest(ctx, t);
-        await ctx.close();
-        hits.push({ ...ref, mutantId: m.id, hit: state.hit, changed: state.changed, status });
-      }
-      results.push(judgeMutant(m, hits, Date.now() - started));
+      const runFault = async (refs: TestRef[]) => {
+        const hits: MutantHitRecord[] = [];
+        for (const ref of refs) {
+          const t = tests.find((x) => x.testId === ref.testId)!;
+          const ctx = await browser.newContext();
+          const state = await injectMutant(ctx, m);
+          const status = await runTest(ctx, t);
+          await ctx.close();
+          hits.push({ ...ref, mutantId: m.id, hit: state.hit, changed: state.changed, status });
+        }
+        return hits;
+      };
+      let result = judgeMutant(m, await runFault(m.tests), 0);
+      const recheck = recheckTargets(result);
+      if (recheck.length) result = applyRecheck(result, await runFault(recheck));
+      results.push({ ...result, durationMs: Date.now() - started });
     }
     const proof = summarizeProof(results);
 
@@ -185,7 +203,7 @@ async function main() {
     // ---- Compare with ground truth ----
     failures.push(...compareWithGroundTruth(loadGroundTruth(), coverage, proof));
 
-    console.log(`UI coverage ${coverage.score}% (${coverage.tested}/${coverage.total}) | Fault check ${proof.score}% (${proof.killed} caught, ${proof.survived} slipped, ${proof.notApplicable} n/a)`);
+    console.log(`UI coverage ${coverage.score}% (${coverage.tested}/${coverage.total}) | Fault check ${proof.score}% (${proof.killed} caught, ${proof.survived} slipped, ${proof.unstable ? `${proof.unstable} unstable, ` : ''}${proof.notApplicable} n/a)`);
     console.log(`Report: ${OUT}/report/index.html`);
   } finally {
     await browser.close();
