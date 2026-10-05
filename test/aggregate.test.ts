@@ -140,3 +140,15 @@ test('list grouping is independent of input order and keeps the denominator stab
   const run2 = ['W', 'X', 'Y', 'Z', 'Q'].map((n) => item('link', n, 'ul > li > a'));
   assert.equal(groupListItems(run2)[0]!.key, groupListItems(items)[0]!.key);
 });
+
+test('only passing tests count; a record with no status still counts', () => {
+  const rec = (testId: string, view: string, status?: string): TestCoverageRecord => ({
+    testId, title: testId, file: 'f', line: 1, ...(status ? { status } : {}), views: [view],
+    inventory: { [view]: [el('button', `Go ${view}`)] }, interactions: { [view]: [`button|Go ${view}|`] },
+  });
+  const s = aggregateCoverage([rec('a', '/a', 'passed'), rec('b', '/b', 'timedOut'), rec('c', '/c', 'failed'), rec('d', '/d')]);
+  assert.deepEqual(s.views.map((v) => v.view).sort(), ['/a', '/d'], 'failed and timed-out views are absent');
+  assert.equal(s.total, 2);
+  assert.equal(s.tests, 2);
+  assert.equal(s.testsExcluded, 2);
+});

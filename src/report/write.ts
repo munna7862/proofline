@@ -25,6 +25,7 @@ export function upgradeCoverage(c: CoverageSummary): CoverageSummary {
   return {
     ...c,
     neverEnabled: c.neverEnabled ?? 0,
+    testsExcluded: c.testsExcluded ?? 0,
     views: c.views.map((v) => ({ ...v, neverEnabled: v.neverEnabled ?? [] })),
   };
 }

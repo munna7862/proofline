@@ -95,7 +95,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   Prompt:
   > Read AGENTS.md, the founder's decision for S4-T3 and learnViewParams in src/coverage/aggregate.ts. Never learn :param at the first path segment unless every value contains a digit or is 20+ characters; once a position is learned under a parent, apply it to every descendant view of that parent. Add demo cases (three unlinked top-level pages stay separate; per-user subpages join the learned view; move /help/tips back to /tips), exact views in demo/expected.json, and unit tests. Run npm run calibrate (before/after line) and npm run verify.
 
-- [ ] **S4-T4 Only passing tests count toward coverage (1.5 h, approved: scoring)**
+- [x] **S4-T4 Only passing tests count toward coverage (1.5 h, approved: scoring)**
   S4-4: the epic-stack 2FA test times out at a different step in each run. Its partial coverage added 4 rows and 2 views to one run only.
   Accept:
   - `aggregateCoverage` ignores records whose status is set and is not `passed`. A record with no status, from an older Proofline, still counts.
