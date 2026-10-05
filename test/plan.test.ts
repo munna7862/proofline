@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alreadyFailing, judgeMutant, plannedResult, planMutants, proofHeadline, summarizeProof } from '../src/proof/plan.ts';
+import { alreadyFailing, applyRecheck, judgeMutant, plannedResult, planMutants, proofHeadline, recheckTargets, summarizeProof } from '../src/proof/plan.ts';
 import { renderReport } from '../src/report/html.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import type { MutantHitRecord, TestNetworkRecord } from '../src/types.ts';
@@ -99,4 +99,42 @@ test('report and Markdown show the reason next to the n/a fault and n/a instead 
   const md = renderMarkdown(undefined, proof);
   assert.match(md, /\*\*Fault check n\/a\*\* · 0 of 0 injected faults caught, 1 not applicable/);
   assert.match(md, /- `POST \/api\/refresh` Network failure: already failing in baseline \(401\)/);
+});
+
+const caughtBy = (...ids: string[]) => {
+  const m = planMutants(baseline)[0]!;
+  const hits = ids.map((id): MutantHitRecord => ({ ...ref(id), mutantId: m.id, hit: true, changed: true, status: 'failed' }));
+  return judgeMutant(m, [...hits, { ...ref('green'), mutantId: m.id, hit: true, changed: true, status: 'passed' }], 0);
+};
+const rerun = (r: ReturnType<typeof caughtBy>, statuses: Record<string, string>): MutantHitRecord[] =>
+  Object.entries(statuses).map(([id, status]) => ({ ...ref(id), mutantId: r.mutant.id, hit: true, changed: true, status }));
+
+test('a fault caught by 1 test whose killer passes on re-run is unstable, outside the score', () => {
+  const r = caughtBy('k1');
+  assert.deepEqual(recheckTargets(r).map((t) => t.testId), ['k1']);
+  const after = applyRecheck(r, rerun(r, { k1: 'passed' }));
+  assert.equal(after.outcome, 'unstable');
+  assert.equal(after.reason, 'flaky test: "k1" passed on re-run');
+  const s = summarizeProof([after, { ...caughtBy('x'), outcome: 'killed' }]);
+  assert.equal(s.unstable, 1);
+  assert.equal(s.score, 100, 'unstable is not judged');
+  assert.equal(proofHeadline(s), 'Fault check 100%: 1 caught, 0 slipped through, 1 unstable.');
+  assert.match(renderMarkdown(undefined, s), /Unstable: caught only by a flaky test/);
+  assert.match(renderMarkdown(undefined, s), /npx proofline replay/);
+  assert.match(renderReport({ project: 'p', proof: s }), /Unstable: flaky test/);
+});
+
+test('2 killers, one flaky: unstable; both fail again: still caught', () => {
+  const r = caughtBy('k1', 'k2');
+  assert.equal(recheckTargets(r).length, 2);
+  assert.equal(applyRecheck(r, rerun(r, { k1: 'failed', k2: 'passed' })).outcome, 'unstable');
+  assert.equal(applyRecheck(r, rerun(r, { k1: 'failed', k2: 'failed' })).outcome, 'killed');
+  assert.equal(applyRecheck(r, []).outcome, 'killed', 'a re-run that recorded nothing changes nothing');
+});
+
+test('3+ killers, survived and n/a faults are not re-checked', () => {
+  assert.deepEqual(recheckTargets(caughtBy('k1', 'k2', 'k3')), []);
+  const r = caughtBy();
+  assert.equal(r.outcome, 'survived');
+  assert.deepEqual(recheckTargets(r), []);
 });

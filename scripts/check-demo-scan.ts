@@ -25,7 +25,7 @@ if (!proof) failures.push('missing demo/.proofline/report/proof-summary.json (ru
 failures.push(...compareWithGroundTruth(loadGroundTruth(), coverage, proof));
 
 if (coverage && proof) {
-  console.log(`Real runner: UI coverage ${coverage.tested}/${coverage.total} | Fault check ${proof.killed} caught, ${proof.survived} slipped, ${proof.notApplicable} n/a`);
+  console.log(`Real runner: UI coverage ${coverage.tested}/${coverage.total} | Fault check ${proof.killed} caught, ${proof.survived} slipped, ${proof.unstable ?? 0} unstable, ${proof.notApplicable} n/a`);
 }
 if (failures.length) {
   console.error('\nDEMO SCAN CHECK FAILED\n- ' + failures.join('\n- '));

@@ -59,7 +59,7 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Read AGENTS.md and the founder's decision for S3-T3 in docs/sprints/SPRINT_03.md. In src/page/agent.ts, skip elements inside role=status, role=alert, aria-live regions and known toaster roots. In src/coverage/aggregate.ts, add a pure function that collapses 3+ siblings with the same path shape, tag and role into one "<role> in list (N seen)" element, tested if any member was. Show N in the HTML report and Markdown summary. Add a demo toast and a generated-name list, ground truth in demo/expected.json, and unit tests including the negative cases. Run npm run calibrate (before/after summary line) and npm run verify.
 
-- [ ] **S3-T4 Flaky catches become "unstable" (2 h, needs approval: fault scoring + report + CLI)**
+- [x] **S3-T4 Flaky catches become "unstable" (2 h, needs approval: fault scoring + report + CLI)**
   S3-3: buggy-books `GET /api/books` "Wrong numbers" shows as caught, but its only killer passes 3/3 with the fault and fails 1/3 without it. The real finding (no catalog test checks prices) is hidden.
   Accept:
   - `src/proof/plan.ts`: a fault killed by 1 or 2 tests re-runs those tests once with the same fault (retries 0). If any killer passes on the re-run, the fault is `unstable` with reason "flaky test: <name> passed on re-run"; it is outside the score.

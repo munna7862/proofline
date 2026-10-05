@@ -47,7 +47,8 @@
 - One fault = one endpoint × one operator. Only tests that called that endpoint run.
 - Killed = at least one of those tests failed while the fault was active.
 - Survived = the fault changed a response and every test that received it passed.
-- Not reached / not applicable / error are shown but excluded from the score.
+- Unstable = killed by only 1 or 2 tests, and at least one of them passed when re-run once with the same fault (retries 0): a flaky failure, not a catch. Faults killed by 3+ tests are not re-run.
+- Not reached / not applicable / unstable / error are shown but excluded from the score.
 - Score = killed / (killed + survived).
 
 ## Known limits (see RISKS.md)

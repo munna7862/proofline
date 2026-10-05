@@ -8,7 +8,8 @@
  * an account endpoint that answers 401 to guests (already failing in baseline),
  * an avatar upload whose button reads "Processing..." while disabled (no phantom elements),
  * a help center whose old view lingers after a client-side route change (no route bleed),
- * and a community page with generated post titles and a toast (repeated lists, no toast elements).
+ * a community page with generated post titles and a toast (repeated lists, no toast elements),
+ * and a tip of the day whose test is flaky on its second run (a flaky catch is "unstable").
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
  */
@@ -166,6 +167,18 @@ document.querySelectorAll('#posts a').forEach((a) => a.addEventListener('click',
 </script>
 </body></html>`;
 
+// Tip of the day from GET /api/tips. The page marks data-state="ok" on any successful response,
+// even an empty tip, so a test that only checks the state lets "Missing text" through.
+const TIPS_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tips</title></head><body>
+<h1>Tip of the day</h1><p id="tip" data-state="loading"></p>
+<script>
+const tip = document.getElementById('tip');
+fetch('/api/tips').then((res) => res.ok ? res.json() : Promise.reject(new Error('status ' + res.status)))
+  .then((data) => { tip.textContent = data.tip; tip.dataset.state = 'ok'; })
+  .catch(() => { tip.textContent = 'No tip today'; tip.dataset.state = 'error'; });
+</script>
+</body></html>`;
+
 const AUTHORS = ['Jayde', 'Ola', 'Kim', 'Ravi', 'Mei', 'Tomas', 'Ines', 'Kofi'];
 /** Five post titles that differ on every server start, five different authors (digits in names are masked). */
 const generatePosts = () => {
@@ -212,6 +225,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     }
     // Nobody signs in on the demo shop, so the account endpoint always answers 401.
     if (url.pathname === '/api/account' && req.method === 'GET') return json(401, { user: null });
+    if (url.pathname === '/api/tips' && req.method === 'GET') return json(200, { tip: 'Pack a reusable bag' });
     if (url.pathname === '/api/reset' && req.method === 'POST') {
       cart = [];
       return json(200, { ok: true });
@@ -224,6 +238,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
+    if (url.pathname === '/help/tips') return res.end(TIPS_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
     // Notes are addressed by a cuid, as in Prisma-backed apps.
