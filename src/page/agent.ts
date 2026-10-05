@@ -16,8 +16,10 @@
 export interface AgentOptions {
   bindingName: string;
   interactiveSelector: string;
-  /** Elements inside a match are never inventoried or counted (dev-only overlays). */
+  /** Elements inside a match are never inventoried or counted (dev-only overlays, toasts). */
   ignoreSelector: string;
+  /** List item selector (LIST_ITEMS): elements inside one carry a `list` signature. */
+  listItemSelector: string;
 }
 
 /**
@@ -38,6 +40,22 @@ export const DEVTOOLS_ROOTS = [
   '.tsqd-open-btn-container',
   '.tsqd-main-panel',
 ].join(',');
+
+/**
+ * Toasts and live regions: transient messages whose text is often data ("Connected your
+ * <name> account"), so their buttons are never app elements. Sonner renders
+ * <ol data-sonner-toaster class="toaster">.
+ */
+export const LIVE_REGIONS = [
+  '[role=status]',
+  '[role=alert]',
+  '[aria-live]:not([aria-live="off"])',
+  'ol[data-sonner-toaster]',
+  '.toaster',
+].join(',');
+
+/** List items whose interactive children are siblings of each other (see ElementInfo.list). */
+export const LIST_ITEMS = 'li,[role=listitem],tr,[role=row]';
 
 export const INTERACTIVE_SELECTOR = [
   'a[href]',
@@ -191,6 +209,26 @@ export function proofAgent(opts: AgentOptions): void {
     return parts.join(' > ');
   };
 
+  // Inside a list item: "<list path> > <path from item to element>" (tags and first class, no
+  // ids: item ids are usually generated). Elements with the same value are siblings in one list.
+  const listOf = (el: Element) => {
+    try {
+      const item = el.closest(opts.listItemSelector);
+      if (!item || !item.parentElement) return undefined;
+      const inner: string[] = [];
+      let cur: Element | null = el;
+      while (cur && inner.length < 6) {
+        const cls = (cur.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)[0];
+        inner.unshift(cur.tagName.toLowerCase() + (cls ? '.' + cls : ''));
+        if (cur === item) break;
+        cur = cur.parentElement;
+      }
+      return cssPath(item.parentElement) + ' > ' + inner.join(' > ');
+    } catch {
+      return undefined;
+    }
+  };
+
   // Disabled, or inside a region marked aria-busy="true": a transient state such as
   // "Processing..." that no test can interact with.
   const isDisabled = (el: Element) => {
@@ -206,6 +244,7 @@ export function proofAgent(opts: AgentOptions): void {
     const name = nameOf(el);
     const testId = testIdOf(el);
     const href = el.tagName === 'A' ? viewOf((el as HTMLAnchorElement).href) : undefined;
+    const list = listOf(el);
     return {
       key: [role, name, testId || ''].join('|'),
       tag: el.tagName.toLowerCase(),
@@ -214,6 +253,7 @@ export function proofAgent(opts: AgentOptions): void {
       testId,
       href,
       path: cssPath(el),
+      ...(list ? { list } : {}),
       ...(isDisabled(el) ? { disabled: true } : {}),
     };
   };
@@ -224,7 +264,7 @@ export function proofAgent(opts: AgentOptions): void {
     return el.getClientRects().length > 0;
   };
 
-  // Inside a dev-only overlay (DEVTOOLS_ROOTS): not part of the app under test.
+  // Inside a dev-only overlay (DEVTOOLS_ROOTS) or a toast / live region (LIVE_REGIONS): not the app under test.
   const isIgnored = (el: Element) => {
     if (!opts.ignoreSelector) return false;
     try {

@@ -13,6 +13,10 @@ export interface ElementInfo {
   path: string;
   /** Seen only while `disabled` or inside `aria-busy="true"` (a busy label such as "Processing..."). */
   disabled?: boolean;
+  /** Inside a list item: the list's path plus the element's path within its item. Same value = siblings. */
+  list?: string;
+  /** Repeated list items collapsed into this one element: how many distinct items were seen. */
+  seen?: number;
 }
 
 export type AgentMessage =

@@ -104,6 +104,16 @@ const tests: DemoTest[] = [
       await eventually(async () => new URL(page.url()).pathname === '/help', 'back on help home');
     },
   },
+  // demo/tests/community.spec.ts: generated list items count once; toasts are not elements
+  {
+    testId: 'c1', title: 'joining greets and a post opens', file: 'demo/tests/community.spec.ts', line: 11, start: '/community',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Join community' }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#toasts'))!.startsWith('Welcome'), 'welcome toast');
+      await page.locator('#posts a').nth(2).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#reading'))!.startsWith('Reading'), 'reading a post');
+    },
+  },
 ];
 
 async function runTest(ctx: BrowserContext, t: DemoTest): Promise<string> {

@@ -83,6 +83,52 @@ function remapViews(rec: TestCoverageRecord, map: Map<string, string>): TestCove
   return { ...rec, views: [...new Set(rec.views.map(to))], inventory, interactions };
 }
 
+/** Minimum number of distinct items before siblings in one list become one element. */
+const LIST_MIN_ITEMS = 3;
+
+/**
+ * Collapses repeated list items in one view into one element (founder rule S3-T3).
+ * Elements with the same `list` signature, tag and role whose keys differ (one per item:
+ * a note title, a faker name) become `<role> in list (N seen)` when there are 3 or more.
+ * It is tested when any item was, by the union of their tests. Fewer than 3 items, a
+ * different role or tag, no `list`, or seen only while disabled: left as they are.
+ * Pure and deterministic: sorted output, independent of input order.
+ */
+export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
+  const groups = new Map<string, ElementCoverage[]>();
+  const rest: ElementCoverage[] = [];
+  for (const el of els) {
+    if (!el.list || el.disabled) {
+      rest.push(el);
+      continue;
+    }
+    const sig = [el.role, el.tag, el.list].join('\0');
+    groups.set(sig, [...(groups.get(sig) ?? []), el]);
+  }
+  for (const members of groups.values()) {
+    const keys = new Set(members.map((m) => m.key));
+    if (keys.size < LIST_MIN_ITEMS) {
+      rest.push(...members);
+      continue;
+    }
+    const sorted = [...members].sort((a, b) => a.key.localeCompare(b.key));
+    const first = sorted[0]!;
+    const testedBy = [...new Set(sorted.flatMap((m) => m.testedBy))].sort();
+    rest.push({
+      key: `${first.role}|in list|${first.list}`,
+      tag: first.tag,
+      role: first.role,
+      name: `in list (${keys.size} seen)`,
+      path: first.path,
+      list: first.list,
+      seen: keys.size,
+      tested: sorted.some((m) => m.tested),
+      testedBy,
+    });
+  }
+  return rest.sort((a, b) => a.key.localeCompare(b.key));
+}
+
 export interface AggregateOptions {
   /** Views to drop entirely, e.g. ['/admin/debug'] */
   ignoreViews?: string[];
@@ -100,6 +146,7 @@ export interface AggregateOptions {
  *    e.g. a "Processing..." label) is not applicable: listed in neverEnabled, outside the score.
  *    Seen enabled once, or interacted with, it is scored like any other element.
  *  - Per-test path segments are merged into one view first (see learnViewParams).
+ *  - 3+ sibling items of one list count as one element, "N seen" (see groupListItems).
  */
 export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOptions = {}): CoverageSummary {
   const learned = learnViewParams(input);
@@ -161,8 +208,7 @@ export function aggregateCoverage(input: TestCoverageRecord[], opts: AggregateOp
   const views: ViewCoverage[] = [...elements.entries()]
     .map(([view, map]) => {
       const all = [...map.values()];
-      const els = all
-        .filter((e) => !e.disabled)
+      const els = groupListItems(all.filter((e) => !e.disabled))
         .sort((a, b) => Number(a.tested) - Number(b.tested) || a.key.localeCompare(b.key));
       const neverEnabled: ElementInfo[] = all
         .filter((e) => e.disabled)

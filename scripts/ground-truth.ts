@@ -18,6 +18,8 @@ interface GroundTruth {
   testedIn?: Record<string, string[]>;
   /** Exact element path per view and key (paths are for humans; they must read right). */
   paths?: Record<string, Record<string, string>>;
+  /** Collapsed list elements per view and key, with how many distinct items they stand for. */
+  seen?: Record<string, Record<string, number>>;
   /** Elements that must be "not applicable: never enabled", outside the score. */
   neverEnabled?: string[];
   proof: Record<string, Record<string, string>>;
@@ -71,6 +73,15 @@ export function compareWithGroundTruth(
       for (const [key, path] of Object.entries(byKey)) {
         const got = v?.elements.find((e) => e.key === key)?.path;
         if (got !== path) failures.push(`coverage: ${view} "${key}" path expected "${path}", got "${got}"`);
+      }
+    }
+  }
+  if (coverage && expected.seen) {
+    for (const [view, byKey] of Object.entries(expected.seen)) {
+      const v = coverage.views.find((x) => x.view === view);
+      for (const [key, n] of Object.entries(byKey)) {
+        const got = v?.elements.find((e) => e.key === key)?.seen;
+        if (got !== n) failures.push(`coverage: ${view} "${key}" expected ${n} seen, got ${got}`);
       }
     }
   }

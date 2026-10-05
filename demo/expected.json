@@ -5,14 +5,16 @@
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/help", "/help/faq"],
+  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/help", "/help/faq", "/community"],
   "elements": {
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
     "/help": ["button|Open FAQ|", "link|Help home|"],
-    "/help/faq": ["button|Was this helpful?|", "link|Help home|"]
+    "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
+    "/community": ["button|Join community|", "link|in list|ul#posts > li > a"]
   },
-  "testedIn": {"/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
+  "testedIn": {"/community": ["button|Join community|", "link|in list|ul#posts > li > a"], "/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
   "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},
+  "seen": {"/community": {"link|in list|ul#posts > li > a": 5}},
   "neverEnabled": ["button|Processing...|"],
   "proof": {
     "GET /api/products": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed"},

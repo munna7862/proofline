@@ -44,7 +44,7 @@ export function renderMarkdown(c?: CoverageSummary, p?: ProofSummary): string {
       const names = v.elements
         .filter((e) => !e.tested)
         .slice(0, 4)
-        .map((e) => (e.name || e.role) + (e.reachedByUrl ? ' †' : ''));
+        .map((e) => (e.seen ? `${e.role} ${e.name}` : e.name || e.role) + (e.reachedByUrl ? ' †' : ''));
       byUrl ||= names.some((n) => n.endsWith(' †'));
       lines.push(`- \`${v.view}\`: ${v.tested}/${v.total} touched. Untouched: ${names.join(', ')}`);
     }

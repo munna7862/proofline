@@ -42,3 +42,13 @@ test('a coverage summary written before never-enabled existed still renders afte
   assert.match(renderReport({ project: 'p', coverage: up }), /About/);
   assert.doesNotThrow(() => renderMarkdown(up));
 });
+
+test('reports show repeated list items as one element with how many were seen', () => {
+  const item = (name: string) => ({ ...el('link', name, '/post'), list: 'ul#posts > li > a' });
+  const c = aggregateCoverage([
+    { testId: 'a', title: 'A', file: 'f', line: 1, views: ['/'], inventory: { '/': [item('Jayde post'), item('Ola post'), item('Kim post'), el('button', 'Join')] }, interactions: { '/': ['button|Join|'] } },
+  ]);
+  assert.equal(c.total, 2);
+  assert.match(renderMarkdown(c), /link in list \(3 seen\)/);
+  assert.match(renderReport({ project: 'p', coverage: c }), /<span class="role">link<\/span> in list \(3 seen\)/);
+});
