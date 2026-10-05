@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aggregateCoverage, learnViewParams } from '../src/coverage/aggregate.ts';
+import { aggregateCoverage, groupListItems, learnViewParams } from '../src/coverage/aggregate.ts';
 import type { TestCoverageRecord } from '../src/types.ts';
 
 const el = (role: string, name: string, href?: string) => ({ key: `${role}|${name}|`, tag: 'x', role, name, href, path: 'x' });
@@ -100,4 +100,43 @@ test('an element seen enabled in any test, or interacted with, is scored', () =>
   assert.equal(s.tested, 1);
   assert.equal(s.neverEnabled, 0);
   assert.equal(s.views[0]!.elements.some((e) => e.disabled), false);
+});
+
+const item = (role: string, name: string, list: string, tested = false, by: string[] = []) => ({
+  key: `${role}|${name}|`, tag: role === 'link' ? 'a' : 'button', role, name, path: 'ul > li > a', list, tested, testedBy: by,
+});
+
+test('3+ siblings in one list become one element, tested when any item was', () => {
+  const out = groupListItems([
+    item('link', 'Note by Jayde', 'ul.notes > li > a', false),
+    item('link', 'Note by Ola', 'ul.notes > li > a', true, ['T2']),
+    item('link', 'Note by Kim', 'ul.notes > li > a', true, ['T1']),
+    item('button', 'Buy', '', false),
+  ]);
+  assert.equal(out.length, 2);
+  const list = out.find((e) => e.seen)!;
+  assert.equal(list.key, 'link|in list|ul.notes > li > a');
+  assert.equal(list.name, 'in list (3 seen)');
+  assert.equal(list.tested, true);
+  assert.deepEqual(list.testedBy, ['T1', 'T2']);
+});
+
+test('2 siblings stay separate; different roles or lists stay separate', () => {
+  const two = groupListItems([item('link', 'A', 'ul > li > a'), item('link', 'B', 'ul > li > a')]);
+  assert.equal(two.length, 2);
+  assert.ok(two.every((e) => !e.seen));
+  const mixed = groupListItems([
+    item('link', 'A', 'ul > li > a'), item('link', 'B', 'ul > li > a'),
+    item('button', 'C', 'ul > li > a'), item('link', 'D', 'ol > li > a'),
+  ]);
+  assert.equal(mixed.length, 4);
+  assert.ok(mixed.every((e) => !e.seen));
+});
+
+test('list grouping is independent of input order and keeps the denominator stable', () => {
+  const items = ['A', 'B', 'C', 'D'].map((n) => item('link', n, 'ul > li > a'));
+  assert.deepEqual(groupListItems(items), groupListItems([...items].reverse()));
+  // Different generated names in two runs give the same single element.
+  const run2 = ['W', 'X', 'Y', 'Z', 'Q'].map((n) => item('link', n, 'ul > li > a'));
+  assert.equal(groupListItems(run2)[0]!.key, groupListItems(items)[0]!.key);
 });

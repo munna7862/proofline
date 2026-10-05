@@ -48,7 +48,7 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Read AGENTS.md and the header comment of src/page/agent.ts. Reproduce route-transition bleed in the demo: a client-side navigation where the previous view's button stays mounted for about 300 ms after pushState. Fix capture so a snapshot whose URL changed during capture is dropped and retaken after the DOM settles. Add ground truth in demo/expected.json. Run npm run calibrate (before/after summary line), npm run demo twice to confirm a stable denominator, and npm run verify.
 
-- [ ] **S3-T3 Toasts and repeated list items (2.5 h, needs approval: inventory + report)**
+- [x] **S3-T3 Toasts and repeated list items (2.5 h, needs approval: inventory + report)**
   S3-4: epic-stack has 26 faker-named note links whose keys are new every run, and a toast `Connected Your "<faker name>" GitHub account…` recorded as an element. Phase 1 exit also lists "repeated lists handled". The nameless `<span>` spot-check miss is checked here too (it sat in a toast region).
   Accept:
   - No element inside a toast/live region is inventoried (list per decision).

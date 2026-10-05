@@ -7,7 +7,8 @@
  * plus per-user profile pages and a note addressed by a cuid (view normalization),
  * an account endpoint that answers 401 to guests (already failing in baseline),
  * an avatar upload whose button reads "Processing..." while disabled (no phantom elements),
- * and a help center whose old view lingers after a client-side route change (no route bleed).
+ * a help center whose old view lingers after a client-side route change (no route bleed),
+ * and a community page with generated post titles and a toast (repeated lists, no toast elements).
  * Tests in demo/tests/ cover some of it well, some of it badly, and some not at all,
  * so Proofline's numbers on this app are known in advance (demo/expected.json).
  */
@@ -142,11 +143,42 @@ render();
 </script>
 </body></html>`;
 
+// Community: 5 post links whose titles are generated at server start (new every run, like faker
+// data in seeded suites) and a toast after joining (Sonner markup, a greeting with a name and a
+// Dismiss button). The 5 links must count as one "in list (5 seen)" element; the toast is not an element.
+const communityPage = (posts: string[]) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Community</title></head><body>
+<h1>Community</h1>
+<button id="join">Join community</button>
+<ul id="posts">${posts.map((p, i) => `<li><a href="/community?post=${i + 1}">${escapeHtml(p)}</a></li>`).join('')}</ul>
+<p id="reading"></p>
+<section aria-label="Notifications"><ol data-sonner-toaster class="toaster" id="toasts"></ol></section>
+<script>
+document.getElementById('join').addEventListener('click', () => {
+  const li = document.createElement('li');
+  li.innerHTML = '<span>Welcome, ${escapeHtml(posts[0]!.split(' ')[0]!)}!</span> <button>Dismiss</button>';
+  li.querySelector('button').addEventListener('click', () => li.remove());
+  document.getElementById('toasts').appendChild(li);
+});
+document.querySelectorAll('#posts a').forEach((a) => a.addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('reading').textContent = 'Reading ' + a.textContent;
+}));
+</script>
+</body></html>`;
+
+const AUTHORS = ['Jayde', 'Ola', 'Kim', 'Ravi', 'Mei', 'Tomas', 'Ines', 'Kofi'];
+/** Five post titles that differ on every server start, five different authors (digits in names are masked). */
+const generatePosts = () => {
+  const offset = Math.floor(Math.random() * AUTHORS.length);
+  return Array.from({ length: 5 }, (_, i) => `${AUTHORS[(offset + i) % AUTHORS.length]} post ${Math.floor(Math.random() * 9000) + 1000}`);
+};
+
 /** How long the avatar upload takes: long enough for Proofline to see the busy button. */
 const UPLOAD_DELAY_MS = 800;
 
 export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Server> {
   let cart: number[] = [];
+  const posts = generatePosts();
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://localhost:${port}`);
     const json = (status: number, body: unknown) => {
@@ -191,6 +223,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
+    if (url.pathname === '/community') return res.end(communityPage(posts));
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
     // Notes are addressed by a cuid, as in Prisma-backed apps.
