@@ -83,7 +83,8 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Run npm pack in C:\Workspace\proofline and install the tarball in both repos under C:\Workspace\proofline-trials on branch proofline-trial. Run each suite's coverage twice (epic-stack with --workers=1) and npx proofline scan --max-mutants 20 once. Compare with the S2 columns in docs/STATUS.md and add a before/after table. Spot-check 20 elements per suite by reading the tests; log any miss as a Sprint 4 candidate. Do not push or publish anything.
 
-- [ ] **S1-T5 Validation kit, carried over again (2 h, founder only, no agent)**
+- [x] **S1-T5 Validation kit, carried over again (2 h, founder only, no agent)**
+  **Result (2026-10-05, founder):** done; leads were contacted. Their answer: once the product is complete they want to see the trial runs, and will decide then. No one has committed yet. Exact DM and reply counts were not recorded here.
   Phase 0 exit; GTM and pricing depend on it. Screenshot the demo report (after S3-T1 to S3-T3 if possible, so the sample is the honest one). Create a free waitlist form (Google Forms or Tally). Send 10 DMs with docs/GO_TO_MARKET.md template A. Log replies in STATUS.md and book up to 5 conversations.
   Accept: waitlist link live; 10 DMs sent; reply count logged in STATUS.md.
 
