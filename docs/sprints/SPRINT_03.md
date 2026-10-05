@@ -69,13 +69,17 @@ D-1: option B. S3-T1: yes. S3-T3: yes, both parts. S3-T4: yes.
   Prompt:
   > Read AGENTS.md and the founder's decision for S3-T4 in docs/sprints/SPRINT_03.md. In src/proof/plan.ts and the scan loop in src/cli.ts, re-run the killing tests of any fault caught by 1 or 2 tests once with the same fault and retries 0; if a killer passes, mark the fault unstable ("flaky test: <name> passed on re-run"), outside the score. Show unstable faults in the HTML report, the Markdown summary and the CLI summary line. Add a deterministic flaky demo test (fails only on its second invocation), ground truth in demo/expected.json, update scripts/check-demo-scan.ts, and add unit tests. Run npm run calibrate, npm run demo:scan, npm run demo:check and npm run verify.
 
-- [ ] **S3-T5 Sprint demo: re-run both trials, before/after (1.5 h)**
+- [x] **S3-T5 Sprint demo: re-run both trials, before/after (1.5 h)**
   Fresh tarball (S3-T0 makes `npm pack` build), reinstall in both trial branches, coverage twice per suite (epic-stack with `--workers=1` as in S2), `npx proofline scan --max-mutants 20` once per suite. Start the buggy-books scan first (about 45 min machine time).
   Accept:
   - STATUS.md gets a before/after table per suite against the S2 columns: coverage % and denominator (both runs), caught / slipped / unstable / n/a / not reached.
   - epic-stack: denominator identical across the two runs; spot-check ≥ 19/20. buggy-books: spot-check still ≥ 19/20; denominator identical across runs in which the same tests pass.
   - buggy-books `GET /api/books` "Wrong numbers" reads unstable or slipped, not caught.
   - Misses logged as Sprint 4 candidates. Nothing pushed or published; trial branches stay local.
+  - **Result (2026-10-05):** run, with three acceptance checks not met.
+    - buggy-books met two checks: the denominator is identical across runs (126 and 126), and "Wrong numbers" reads slipped. The spot-check is 18/20.
+    - epic-stack fell from 480 to 224 elements and its spot-check rose from 9/20 to 18/20, but the denominator still differs between runs: 224 vs 228, or 224 vs 217 with passing tests only.
+    - The remaining causes are logged as S4-1 to S4-8 in docs/STATUS.md: per-run data in names, a failing test's partial coverage, Radix pointer-down menus, focus guards, nested links, and renamed fields.
   Prompt:
   > Run npm pack in C:\Workspace\proofline and install the tarball in both repos under C:\Workspace\proofline-trials on branch proofline-trial. Run each suite's coverage twice (epic-stack with --workers=1) and npx proofline scan --max-mutants 20 once. Compare with the S2 columns in docs/STATUS.md and add a before/after table. Spot-check 20 elements per suite by reading the tests; log any miss as a Sprint 4 candidate. Do not push or publish anything.
 

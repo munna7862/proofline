@@ -8,6 +8,7 @@ Planned in [SPRINT_03.md](SPRINT_03.md): prepack build, devtools exclusion, rout
 Decision D-1 option B approved 2026-10-04: Phase 1 exit moves to week 4, later sprints move one week.
 
 ## Sprint 4: Phase 1 close-out (week 4)
+- First: the S3-T5 trial findings S4-1 to S4-7 in STATUS.md ("Sprint 4 candidates"): per-run names (S4-1), pointer-down triggers (S4-2), learned `:param` rework incl. S3-5/S3-12 (S4-3), failing tests' coverage (S4-4), nested links (S4-5), renamed fields (S4-6), focus guards (S4-7). Several need founder approval. Re-scope the rest of this list with /plan-sprint.
 - Open shadow roots and same-origin iframes in the agent, with demo pages + ground truth
 - `proofline.config.json` (ignoreViews, ignoreElements, viewRules) + default infra endpoint excludes (`/socket.io`, suite `/api/test/*` backdoors)
 - `proofline merge` for CI shards
