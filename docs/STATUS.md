@@ -29,6 +29,8 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-10-04 S3-T1 done (founder approved): dev-only overlays are not app elements (S3-1). The agent skips anything inside a devtools root: TanStack Devtools (`[data-testid="tanstack_devtools"]`, `#tanstack_devtools`; react-router-devtools 6 renders inside it), react-router-devtools standalone (`.react-router-dev-tools`, `[data-testid^="react-router-devtools"]`) and TanStack Query devtools (`.tsqd-open-btn-container`, `.tsqd-main-panel`). Markers read from the packages in the epic-stack trial (@tanstack/devtools 0.10.4, react-router-devtools 6.2.1) and the query-devtools source; one constant, `DEVTOOLS_ROOTS`, passed to the agent as `ignoreSelector` (ready for `ignoreElements` in Sprint 4). Also S3-8: element paths read ids with `getAttribute('id')`, so a form with `<input name="id">` reads `form#feedback`, not `form#[object HTMLInputElement]`. Demo: the help page carries 3 fake devtools roots with one button each and a feedback form with a hidden `id` input; ground truth pins both views' elements (devtools absent) and gains an exact `paths` check. The old agent fails it (3 devtools buttons on `/help`, clobbered path). Numbers unchanged: the devtools buttons never enter the denominator. `npm run demo` twice prints 8/16; real runner (`demo:check`) matches. Verify: `UI coverage 50% (8/16) | Fault check 92.9% (13 caught, 1 slipped, 8 n/a)`, 38/38 unit tests.
 - 2026-10-04 S3-T3 done (founder approved): toasts and repeated list items (S3-4). (a) The agent never inventories anything inside a toast or live region (`role=status`, `role=alert`, `aria-live` other than off, Sonner's `ol[data-sonner-toaster]` / `.toaster`; constant `LIVE_REGIONS`). (b) The agent tags elements inside a list item (`li`, `[role=listitem]`, `tr`, `[role=row]`) with a `list` signature (list path plus the path inside the item); aggregation (`groupListItems`, pure) collapses 3+ distinct keys with the same signature, tag and role into one element, key `<role>|in list|<signature>`, shown as "<role> in list (N seen)" in the HTML report and Markdown, tested when any item was. The key holds no item names, so generated names (faker) no longer change the denominator between runs. Demo: `/community` with 5 post links titled at server start (new every run) and a Sonner-style toast with a Dismiss button; ground truth pins one list element, tested, 5 seen (new `seen` check), and no toast element. The old engine fails it (4 post links + Dismiss, 10/22). Numbers move because of the new page only (+2 elements, both tested). Unit tests: 3 items group, 2 stay separate, different role or list stays separate, input order and item names do not change the result. Watch in S3-T5: nav menus built as `ul > li > a` with 3+ links also collapse into one element. `npm run demo` twice prints 10/18; real runner (`demo:check`) matches. Verify: `UI coverage 55.6% (10/18) | Fault check 92.9% (13 caught, 1 slipped, 8 n/a)` (was 50%, 8/16), 42/42 unit tests.
 - 2026-10-05 S3-T4 done (founder approved): flaky catches become "unstable" (S3-3). A fault caught by 1 or 2 tests re-runs those tests once with the same fault (retries 0); if any of them passes, the fault is `unstable` with reason "flaky test: "<name>" passed on re-run", outside the score (`recheckTargets` and `applyRecheck` in `src/proof/plan.ts`, used by the scan loop and calibration). Faults caught by 3+ tests are not re-run. The HTML report shows an "Unstable: flaky test" badge, filter and reason with the replay id; the Markdown summary lists them; the CLI line reads e.g. `Fault check 94%: 15 caught, 1 slipped through, 1 unstable, 10 not applicable.` Demo: `/help/tips` (GET `/api/tips`) with a test that only checks the tip loaded and fails on its second invocation only (counter in `demo/.proofline`, reset by any non-fault run), which is the first fault run on that endpoint, "Missing text". Ground truth: that fault unstable, 500 and network failure caught, empty result and wrong numbers n/a. Real catches by 1 to 2 tests (e.g. `POST /api/cart`) stay caught after the re-run. Found: the learned `:param` rule merged three unlinked top-level demo pages into `/:param`, so the demo page lives under `/help`; logged as S3-12. Unit tests: 1 killer flaky, 2 killers one flaky, both fail again, empty re-run, 3+ killers not re-run. Verify: `UI coverage 55.6% (10/18) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)` (was 92.9%, 13 caught, 8 n/a; +2 caught, +1 unstable, +2 n/a from the new endpoint), 45/45 unit tests.
+- 2026-10-05 S3-T5 done: both trials re-run from a fresh tarball (local only). buggy-books 36% (45/126) on both runs (S2 133 vs 139), `GET /api/books` "Wrong numbers" slipped, `GET /api/cart` "Missing text" unstable (flaky killer), spot-check 18/20. epic-stack 29% (65/224) vs 30% (69/228), 224 vs 217 on passing tests only (S2 480 vs 468), spot-check 18/20 (S2 9/20): devtools, toasts and route bleed are gone; what remains is per-run data in element names and views, a failing test's partial coverage, Radix pointer-down menus and focus guards. Three acceptance checks not met; details in "Sprint 3 demo" and Sprint 4 candidates S4-1 to S4-8 below.
+- 2026-10-05 S1-T5 done (founder): validation outreach sent to QA leads. Their answer: they want to see the trial runs once the product is complete, and will decide then. No commitments yet, so the Week 2 metric (3 "I'd try this on my suite") is not met. Consequence for the plan: the trial results are now the sales material, so the Phase 1 bar (both trial suites spot-check at least 19/20, stable denominators) and a clean trial write-up matter more than new features. DM and reply counts were not recorded.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):
@@ -103,6 +105,86 @@ Ranked by impact on trust in the numbers.
 | S3-10 | **Summaries carry no schema version.** | The S2-T5 crash: an S1 `coverage-summary.json` on disk broke `scan` after all 20 faults had run. Fixed by filling missing fields on load. | Add a `schemaVersion` to both summaries; on mismatch, ignore the old file and say so. Needs architect (types.ts). |
 | S3-11 | **`npm pack` ships a stale `dist/`.** | The ENOBUFS fix was missing from the first S2-T5 tarball until `npm run build` was run by hand. | `"prepack": "npm run build"` (spun off as a separate task). |
 | S3-12 | **Learned `:param` merges unrelated top-level pages.** Needs approval (view rule). | Found in S3-T4: with three unlinked demo pages `/help`, `/community`, `/tips`, each visited by one test, the S2-T1 rule collapsed them into `/:param`. Real apps usually link pages from a nav in 2+ tests, which blocks the rule, so the trials did not show it. | Never learn `:param` for the first path segment, or require the values to look generated (digits, or names never seen as link text). Demo case with 3 unlinked top-level pages. |
+
+## Sprint 3 demo: trial re-run, before/after (S3-T5, 2026-10-05)
+Same repos, branches and two-line integration as S2. Proofline came from a fresh `npm pack` tarball of `sprint3/s3-t4-unstable`, identical to `main` after PR #12. Run the same way as S2:
+- buggy-books: `--project=chromium`.
+- epic-stack: coverage with `--workers=1`.
+- Scans: default 2 workers, `--max-mutants 20`. Both scans planned the same 20 faults as S2.
+
+Raw results are in `C:\Workspace\proofline-trials\s3-results` and `*-s3*.log` (local only, nothing pushed).
+
+**buggy-books** (Express + React, 55 tests)
+
+| | S2 run 1 | S2 run 2 | S3 run 1 | S3 run 2 |
+|---|---|---|---|---|
+| UI coverage | 34% (45/133), 5 n/a | 32% (45/139), 2 n/a | **36% (45/126)**, 5 n/a | **36% (45/126)**, 5 n/a |
+| Tests passing | 55 | 55 (2 flaky) | 55 | 55 |
+| Fault check | 73.3%: 11 caught, 4 slipped, 5 n/a, 0 not reached | | **79%: 11 caught, 3 slipped, 1 unstable, 5 n/a, 0 not reached** | |
+| Spot-check | 20/20 | | **18/20** | |
+
+- **Denominator:** identical across two runs (126 and 126). In S2 the counts were 133 and 139, and S3-T2 removed the route bleed behind that gap.
+- **`GET /api/books` "Wrong numbers":** reads **slipped**, not caught, which is the S2-T5 finding. This time the flaky "Complete Book Purchase" did not flake. If it had, S3-T4 would now report the fault as unstable.
+- **`GET /api/cart` "Missing text":** reads **unstable**. Its only killer, "WS_EVENT_02: Hot-Toast Alert Trigger", passed when re-run with the same fault. This is the S3-T4 rule doing its job; in S1 this fault was a false "caught".
+- **Spot-check misses (2):**
+  - The "Proceed to Checkout" `<a>` wraps a `<button>`. The click credits only the button, so the link stays untested, although the documented rule says an event on an element "or inside it" counts.
+  - `/login` lists the password field twice. `textbox|Password|` is tested; `textbox|txt_pwd_#|` is untested and has no id, because the app sets the input's id after its first render and an early scan named it by its `name` attribute.
+  - Neither miss comes from S3 changes. S2's sample didn't hit these rows.
+
+**epic-stack** (React Router 7, 24 tests)
+
+| | S2 run 1 | S2 run 2 | S3 run 1 | S3 run 2 |
+|---|---|---|---|---|
+| UI coverage | 14% (65/480), 5 n/a | 14% (65/468), 3 n/a | **29% (65/224)** | **30% (69/228)**, 2 n/a |
+| Passing tests only (re-aggregated) | | | 224 | 217 |
+| Tests passing | 23/24 | 23/24 | 23/24 | 23/24 (same 2FA test times out) |
+| Views | 20 | 20 | 20 | 22 |
+| Fault check | 92%: 11 caught, 1 slipped, 8 not reached (23/24 baseline) | | **100%: 13 caught, 0 slipped, 1 unstable, 6 not reached** (22/24 baseline) | |
+| Spot-check | 9/20 | | **18/20** | |
+
+- **What S3-T1/T2/T3 removed:** devtools buttons (about 10 per view), toasts and route bleed. None are left in the inventory or in the sample. The denominator halved, 480 → 224.
+- **Denominator still not identical:** 224 vs 228 (acceptance not met).
+  - 4 rows come from the 2FA test. It times out in both runs, but it gets further in run 2 (two extra views, `/settings/profile/two-factor` and `/verify`), and a failing test's coverage still counts.
+  - With only the 23 passing tests, the gap is 224 vs 217. Every remaining differing row has a name or view built from per-run data:
+    - "<faker name>'s Notes" owner links (one per page)
+    - "Change email from <faker email>"
+    - "<name> profile" on `/users` (1–2 items, below the 3-item list rule)
+    - note titles in the editor sidebar
+    - the test user's own page `/users/<name>`, which stays verbatim
+- **Spot-check misses (2):**
+  - "User menu" is untested on every view, although onboarding, passkey and 2FA tests click it. Radix opens its dropdown on `pointerdown`, and the modal menu then sets `pointer-events: none` on the body, so the `click` never reaches the trigger.
+  - A nameless `<span>` directly under `body` is inventoried. It is almost certainly one of Radix's invisible `tabindex=0` focus-guard spans; the same row was a miss in S2.
+- **Fault changes vs S2:** mostly moves between "not reached" and caught.
+  - Not reached → caught: callback, login (GET and POST) 500 and logout network failure.
+  - Caught → not reached, or slipped → not reached: the four `/onboarding.data` faults.
+  - The baseline passed 22 tests this time vs 23, so this is dev-server timing (Sprint 5: baseline twice).
+  - `POST /forgot-password.data` network failure is **unstable**: its only killer, "reset password with a short code", passed when re-run with the same fault.
+
+**Acceptance (sprint plan):**
+
+| Check | Result |
+|---|---|
+| epic-stack denominator identical across two runs | **not met** (224 vs 228; 224 vs 217 on passing tests only) |
+| epic-stack spot-check ≥ 19/20 | **not met** (18/20, up from 9/20) |
+| buggy-books spot-check ≥ 19/20 | **not met** (18/20) |
+| buggy-books denominator identical across runs where the same tests pass | **met** (126 and 126) |
+| buggy-books `GET /api/books` "Wrong numbers" is unstable or slipped, not caught | **met** (slipped) |
+
+**Phase 1 exit ("runs on 2 public repos", trusted numbers):** not yet. The causes that are left are now narrow and named; see the Sprint 4 candidates below.
+
+## Sprint 4 candidates (from S3-T5)
+Ranked by impact on trust in the numbers.
+
+| # | Problem | Evidence | Proposed fix |
+|---|---|---|---|
+| S4-1 | **Elements named by per-run data.** Needs approval (inventory rule). | epic-stack: every row that differs between passing runs ("<name>'s Notes", "Change email from <email>", "<name> profile", note titles). | Same idea as the learned `:param` for views: in one view, elements with the same path, tag and role whose names each come from a single test, 3+ names, become one element. Pure function in aggregate, demo case with per-test names. |
+| S4-2 | **Pointer-down triggers never count as tested.** Needs approval (definition of tested). | epic-stack "User menu" (Radix dropdown), clicked by 3 tests, untested on 10 views. Headless UI and Radix popovers, selects and menus open on `pointerdown`. | Count a trusted `pointerdown` on an element with `aria-haspopup` or `aria-expanded` as an interaction (or any trusted `pointerdown`). Demo: a menu trigger that opens on pointerdown and blocks the click. |
+| S4-3 | **Learned `:param` gaps.** Needs approval (view rule). | epic-stack: `/users/<test user>` stays verbatim (visited by 1–2 tests). Demo (S3-12): three unlinked top-level pages merge into `/:param`. | Rework the rule once for both: apply a learned position to all descendants (S3-5), never learn the first segment unless values look generated, and handle the per-test own page. |
+| S4-4 | **Coverage from failing tests varies run to run.** Needs approval (scoring). | epic-stack 2FA test times out at different points: +4 rows and 2 views in run 2 only. | Count only passing tests' inventory and interactions (the same rule the fault check already uses), and show "N tests failed, their coverage is not counted" in the report. |
+| S4-5 | **Nested interactive elements.** | buggy-books: `<a>` wrapping `<button>` "Proceed to Checkout": the button is tested and the link is not. | Credit the event to every interactive ancestor up to the first one that is not a link or a button wrapper, or treat a link that only wraps one button as that button. Demo case. |
+| S4-6 | **One element recorded under two names.** | buggy-books `/login`: `textbox|txt_pwd_#|` (before the app sets the id) next to `textbox|Password|`. | The agent remembers the key it first sent for each element (WeakMap); when the same node is later named differently, it sends a rename instead of a new element. |
+| S4-7 | **Focus-guard spans inventoried.** | epic-stack: nameless `body > span` (Radix `data-radix-focus-guard`, opacity 0, tabindex 0). | Add `[data-radix-focus-guard]`, `[data-focus-guard]` and Headless UI's focus-guard to the agent's ignore list; skip nameless `tabindex` elements with zero opacity. |
+| S4-8 | **"Not reached" flips with dev-server timing.** | epic-stack: 5 faults moved between not reached and caught vs S2 with the same plan. | Sprint 5 "baseline twice": plan only from tests that pass both baselines. |
 
 ## Not yet run
 - vscode-extension/ (Phase 4 skeleton).
