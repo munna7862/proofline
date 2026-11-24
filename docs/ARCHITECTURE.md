@@ -34,7 +34,7 @@
 
 **UI coverage**
 - Interactive element = link, button, input, select, textarea, summary, contenteditable, ARIA widget roles, positive tabindex. Hidden elements are ignored.
-- Identity = role + accessible name (digits replaced by #) + test id, per view. Repeated rows with the same identity count once. Form fields and contenteditable controls use label and field metadata such as `name`, `id` or placeholder. Contenteditable text is also excluded when reading labels for nearby controls.
+- Identity = role + accessible name (digits replaced by #) + test id, per view. Repeated rows with the same identity count once. Form fields and contenteditable controls use label and field metadata such as `name`, `id` or placeholder. Draft text stays out of control labels after an observed editor becomes read-only. Explicitly noneditable controls inside an editor keep their labels. Coverage omits destinations of links inside draft content.
 - Repeated list items: 3+ elements with the same role and tag at the same place inside sibling list items (`li`, `[role=listitem]`, `tr`, `[role=row]`) whose identities differ (a note title, a generated name) count as one element, shown as "in list (N seen)". It is tested when any item was.
 - Not app elements: anything inside known dev-only overlays (TanStack Devtools, react-router-devtools, TanStack Query devtools) or inside a toast / live region (`role=status`, `role=alert`, `aria-live`, Sonner's toaster) is never inventoried.
 - Not applicable, never enabled = an element no test ever saw enabled (only `disabled` or inside `aria-busy="true"`, such as a "Processing..." label). Listed per view in the report, outside the score. Seen enabled once, or interacted with, it is scored.

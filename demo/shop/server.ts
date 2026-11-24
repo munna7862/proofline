@@ -117,9 +117,14 @@ const OUTAGE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 
 const DRAFTS_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Drafts</title></head><body>
 <h1>Drafts</h1>
-<div id="note" contenteditable="true"></div>
+<div id="draft-label"><div id="note" contenteditable="true"></div></div>
 <div id="plain-note" contenteditable="plaintext-only" aria-label="Plain note"></div>
-<button id="preview" aria-labelledby="note">Preview</button>
+<div id="rich-note" contenteditable="true">
+  <a href="/documents/ProoflineDraftLinkPathMarker">ProoflineDraftLinkTextMarker</a>
+  <div contenteditable="false"><button>Accept</button><button>Reject</button></div>
+</div>
+<button id="lock" onclick="document.getElementById('note').contentEditable = 'false'">Lock draft</button>
+<button id="preview" aria-labelledby="draft-label">Preview</button>
 <a href="#/editor?draft=ProoflineLinkMarker">Draft view</a>
 </body></html>`;
 

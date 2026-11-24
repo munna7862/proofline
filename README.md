@@ -9,7 +9,7 @@ Proofline checks whether your Playwright tests would actually catch a broken app
 
 Everything runs locally. Nothing is sent anywhere.
 
-Coverage uses labels and field metadata for contenteditable controls and strips query parameters from view URLs, including hash routes. If you generated a coverage report with an older build, rerun your Playwright tests to regenerate its raw records and report before sharing.
+Coverage uses labels and field metadata for contenteditable controls, keeps draft text private when an editor becomes read-only, and omits destinations of links inside draft content. View URLs omit query parameters, including in hash routes. If you generated a coverage report with an older build, rerun your Playwright tests to regenerate its raw records and report before sharing.
 
 ## Status
 

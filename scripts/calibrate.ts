@@ -45,6 +45,10 @@ const tests: DemoTest[] = [
     body: async (page) => {
       await page.locator('#note').fill('ProoflineEditorMarker', { timeout: 2000 });
       await page.locator('#plain-note').fill('ProoflinePlainEditorMarker', { timeout: 2000 });
+      await page.getByRole('button', { name: 'Reject' }).click({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Lock draft' }).click({ timeout: 2000 });
+      if ((await page.locator('#note').getAttribute('contenteditable')) !== 'false') throw new Error('draft unlocked');
+      await page.locator('#preview').click({ timeout: 2000 });
     },
   },
   {

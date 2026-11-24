@@ -156,9 +156,23 @@ export function proofAgent(opts: AgentOptions): void {
     return 'generic';
   };
 
+  const editingHosts = new WeakSet<Element>();
+  const isEditingHost = (el: Element) => {
+    if (el.matches(opts.editableSelector)) editingHosts.add(el);
+    return editingHosts.has(el);
+  };
+
+  const isDraftContent = (el: Element) => {
+    for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+      if (isEditingHost(cur)) return true;
+      if (cur.getAttribute('contenteditable')?.toLowerCase() === 'false') return false;
+    }
+    return false;
+  };
+
   // User-entered values are not labels. Contenteditable stores its value in DOM text.
   const isField = (el: Element) => {
-    if (el.closest(opts.editableSelector)) return true;
+    if (isDraftContent(el)) return true;
     const tag = el.tagName;
     if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
     if (tag !== 'INPUT') return false;
@@ -167,8 +181,8 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const labelText = (el: Element, rendered = false): string => {
-    if (el.closest(opts.editableSelector)) return '';
-    if (!el.querySelector(opts.editableSelector)) {
+    if (isDraftContent(el)) return '';
+    if (!Array.from(el.getElementsByTagName('*')).some(isEditingHost)) {
       return (rendered && (el as HTMLElement).innerText) || el.textContent || '';
     }
     // Drop editable subtrees even when a surrounding control or aria-labelledby supplies the name.
@@ -269,7 +283,7 @@ export function proofAgent(opts: AgentOptions): void {
     const role = roleOf(el);
     const name = nameOf(el);
     const testId = testIdOf(el);
-    const href = el.tagName === 'A' ? viewOf((el as HTMLAnchorElement).href) : undefined;
+    const href = el.tagName === 'A' && !isDraftContent(el) ? viewOf((el as HTMLAnchorElement).href) : undefined;
     const list = listOf(el);
     return {
       key: [role, name, testId || ''].join('|'),
@@ -330,6 +344,8 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const scan = (final = false) => {
+    // Track hosts even when they are hidden or later lose the contenteditable attribute.
+    document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     const view = viewOf(location.href);
     const seen = (seenPerView[view] = seenPerView[view] || {});
     const fresh: any[] = [];
@@ -408,11 +424,22 @@ export function proofAgent(opts: AgentOptions): void {
     currentView = viewOf(location.href);
     emit({ type: 'view', view: currentView });
     scan();
-    new MutationObserver(scheduleScan).observe(document.documentElement, {
+    new MutationObserver((changes) => {
+      for (const change of changes) {
+        if (change.attributeName !== 'contenteditable') continue;
+        const target = change.target as Element;
+        const previous = change.oldValue?.toLowerCase();
+        // A toggle can complete before the next scan. Keep treating its retained text as a draft.
+        if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
+        isEditingHost(target);
+      }
+      scheduleScan();
+    }).observe(document.documentElement, {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy'],
+      attributeOldValue: true,
+      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable'],
     });
   };
 
