@@ -8,7 +8,7 @@ import type { CoverageSummary, MutantOutcome, MutantResult, ProofSummary } from 
 
 export interface GroundTruth {
   coverage: {
-    counts: Pick<CoverageSummary, 'tests' | 'tested' | 'total' | 'neverEnabled' | 'score'>;
+    counts: Pick<CoverageSummary, 'tests' | 'neverEnabled'>;
     untested: string[];
     tested: string[];
   };
@@ -71,7 +71,33 @@ export function compareWithGroundTruth(
 ): string[] {
   const failures: string[] = [];
   if (coverage) {
-    checkNumbers(failures, 'coverage', expected.coverage.counts, coverage);
+    const { tests, neverEnabled: expectedNeverEnabled } = expected.coverage.counts;
+    checkNumbers(failures, 'coverage', { tests, neverEnabled: expectedNeverEnabled }, coverage);
+
+    const got = coverage.views.map((v) => v.view).sort();
+    const want = [...expected.views].sort();
+    if (got.join('\n') !== want.join('\n')) failures.push(`coverage: views expected [${want.join(', ')}], got [${got.join(', ')}]`);
+
+    let total = 0;
+    let tested = 0;
+    let complete = true;
+    for (const view of want) {
+      const elements = expected.elements[view];
+      const testedIn = expected.testedIn[view];
+      if (!elements) failures.push(`coverage: no expected inventory for ${view}`);
+      if (!testedIn) failures.push(`coverage: no expected tested controls for ${view}`);
+      if (!elements || !testedIn) {
+        complete = false;
+        continue;
+      }
+      total += elements.length;
+      tested += testedIn.length;
+    }
+    if (complete) {
+      const score = total ? Math.round((tested / total) * 1000) / 10 : 0;
+      checkNumbers(failures, 'coverage', { tested, total, score }, coverage);
+    }
+
     let neverEnabled = 0;
     for (const view of coverage.views) {
       checkNumbers(failures, `coverage ${view.view}`, {
@@ -80,21 +106,12 @@ export function compareWithGroundTruth(
       }, view);
       neverEnabled += view.neverEnabled.length;
     }
-    if (neverEnabled !== expected.coverage.counts.neverEnabled) {
-      failures.push(`coverage: never enabled inventory expected ${expected.coverage.counts.neverEnabled}, got ${neverEnabled}`);
+    if (neverEnabled !== expectedNeverEnabled) {
+      failures.push(`coverage: never enabled inventory expected ${expectedNeverEnabled}, got ${neverEnabled}`);
     }
   }
   if (coverage && expected.testsExcluded !== undefined && coverage.testsExcluded !== expected.testsExcluded) {
     failures.push(`coverage: testsExcluded expected ${expected.testsExcluded}, got ${coverage.testsExcluded}`);
-  }
-  if (coverage) {
-    const got = coverage.views.map((v) => v.view).sort();
-    const want = [...expected.views].sort();
-    if (got.join('\n') !== want.join('\n')) failures.push(`coverage: views expected [${want.join(', ')}], got [${got.join(', ')}]`);
-    for (const view of want) {
-      if (!Object.hasOwn(expected.elements, view)) failures.push(`coverage: no expected inventory for ${view}`);
-      if (!Object.hasOwn(expected.testedIn, view)) failures.push(`coverage: no expected tested controls for ${view}`);
-    }
   }
   if (coverage && expected.reachedByUrl) {
     for (const key of expected.reachedByUrl) {

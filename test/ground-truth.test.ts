@@ -8,7 +8,7 @@ import type { MutantResult, TestRef } from '../src/types.ts';
 const ref: TestRef = { testId: 'demo', title: 'checks cart', file: 'cart.spec.ts', line: 1 };
 const button = { key: 'button|Add|', tag: 'button', role: 'button', name: 'Add', path: 'button' };
 const expected: GroundTruth = {
-  coverage: { counts: { tests: 1, tested: 1, total: 1, neverEnabled: 0, score: 100 }, untested: [], tested: [button.key] },
+  coverage: { counts: { tests: 1, neverEnabled: 0 }, untested: [], tested: [button.key] },
   testsExcluded: 0,
   views: ['/'],
   elements: { '/': [button.key] },
@@ -51,6 +51,18 @@ test('ground truth requires exact control expectations for every view', () => {
   assert.deepEqual(compareWithGroundTruth(incomplete, coverage, undefined), [
     'coverage: no expected inventory for /',
     'coverage: no expected tested controls for /',
+  ]);
+});
+
+test('ground truth derives the coverage summary from exact view expectations', () => {
+  const staleCounts = { ...expected.coverage.counts, tested: 0, total: 2, score: 0 };
+  const staleExpected = { ...expected, coverage: { ...expected.coverage, counts: staleCounts } };
+  const staleCoverage = { ...coverage, ...staleCounts };
+
+  assert.deepEqual(compareWithGroundTruth(staleExpected, staleCoverage, undefined), [
+    'coverage: tested expected 1, got 0',
+    'coverage: total expected 1, got 2',
+    'coverage: score expected 100, got 0',
   ]);
 });
 
