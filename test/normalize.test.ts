@@ -14,6 +14,12 @@ test('viewKey includes hash-router paths', () => {
   assert.equal(viewKey('http://x.test/a?q=1'), '/a');
 });
 
+test('viewKey ignores hash-router queries and anchors without decoding path delimiters', () => {
+  assert.equal(viewKey('http://x.test/app?mode=draft#/users/42?draft=private#preview'), '/app#/users/:id');
+  assert.equal(viewKey('http://x.test/app#/users/42#private'), '/app#/users/:id');
+  assert.equal(viewKey('http://x.test/app#/docs/q%3Fa%23b?draft=private'), '/app#/docs/q%3Fa%23b');
+});
+
 test('endpointKey ignores query and normalizes method', () => {
   assert.equal(endpointKey('get', 'http://x.test/api/p/7?page=2'), 'GET http://x.test/api/p/:id');
 });

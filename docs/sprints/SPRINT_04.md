@@ -42,6 +42,9 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
 
 ## Tasks
 
+- [x] **S4-T8 Keep editor input and hash-route query values out of coverage artifacts**
+  Follow-up from the repository review. Contenteditable controls, including plaintext-only editors, retain stable labels. Hash-route views and link destinations retain the normalized route path. The demo checks that synthetic field values and query values are absent from raw coverage, JSON, HTML and Markdown. See the verification result in [STATUS.md](../STATUS.md).
+
 - [x] **S4-T0 Focus guards are not app elements (0.5 h)**
   S4-7: a nameless `body > span` on epic-stack, Radix's invisible `tabindex=0` focus-guard. It was a spot-check miss in S2 and S3.
   Accept:

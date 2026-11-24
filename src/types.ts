@@ -20,7 +20,7 @@ export interface ElementInfo {
 }
 
 export type AgentMessage =
-  | { type: 'view'; view: string; url: string }
+  | { type: 'view'; view: string }
   | { type: 'inventory'; view: string; elements: ElementInfo[] }
   | { type: 'interaction'; view: string; key: string; event: string };
 

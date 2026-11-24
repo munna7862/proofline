@@ -9,6 +9,8 @@ Proofline checks whether your Playwright tests would actually catch a broken app
 
 Everything runs locally. Nothing is sent anywhere.
 
+Coverage uses labels and field metadata for contenteditable controls and strips query parameters from view URLs, including hash routes. If you generated a coverage report with an older build, rerun your Playwright tests to regenerate its raw records and report before sharing.
+
 ## Status
 
 Version `0.1.0`, pre-release. **Not published to npm yet** (the unscoped name `proofline` on npm belongs to an unrelated package; install from source as shown below).

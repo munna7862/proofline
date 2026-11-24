@@ -37,11 +37,11 @@ export function normalizePath(pathname: string): string {
   return joined.length > 1 && joined.endsWith('/') ? joined.slice(0, -1) : joined || '/';
 }
 
-/** View key for a page URL: normalized path plus hash-router path if present. */
+/** View key for a page URL: normalized path plus hash-router path, without queries or anchors. */
 export function viewKey(rawUrl: string): string {
   const url = new URL(rawUrl);
   let key = normalizePath(url.pathname);
-  if (url.hash.startsWith('#/')) key += '#' + normalizePath(url.hash.slice(1));
+  if (url.hash.startsWith('#/')) key += '#' + normalizePath(url.hash.slice(1).split(/[?#]/, 1)[0]!);
   return key;
 }
 

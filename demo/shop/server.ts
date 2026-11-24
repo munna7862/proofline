@@ -115,6 +115,14 @@ const OUTAGE_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <h1>Outage</h1><button id="retry">Retry</button>
 </body></html>`;
 
+const DRAFTS_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Drafts</title></head><body>
+<h1>Drafts</h1>
+<div id="note" contenteditable="true"></div>
+<div id="plain-note" contenteditable="plaintext-only" aria-label="Plain note"></div>
+<button id="preview" aria-labelledby="note">Preview</button>
+<a href="#/editor?draft=ProoflineLinkMarker">Draft view</a>
+</body></html>`;
+
 /** How long the old help view stays mounted after the route change: longer than the agent's 250 ms scan debounce. */
 const LEAVE_MS = 400;
 
@@ -243,6 +251,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/about') return res.end(simplePage('About us'));
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
+    if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/help/tips') return res.end(TIPS_PAGE);
