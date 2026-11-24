@@ -4,20 +4,24 @@
  * scripts/check-demo-scan.ts (the real Playwright runner), so both are held to the same rules.
  */
 import { readFileSync } from 'node:fs';
-import type { CoverageSummary, ProofSummary } from '../src/types.ts';
+import type { CoverageSummary, MutantOutcome, MutantResult, ProofSummary } from '../src/types.ts';
 
-interface GroundTruth {
-  coverage: { untested: string[]; tested: string[] };
+export interface GroundTruth {
+  coverage: {
+    counts: Pick<CoverageSummary, 'tests' | 'tested' | 'total' | 'neverEnabled' | 'score'>;
+    untested: string[];
+    tested: string[];
+  };
   /** Tests whose failure keeps their coverage out of the summary. */
   testsExcluded?: number;
   /** Exact set of view keys the coverage summary must contain. */
-  views?: string[];
+  views: string[];
   /** Links that must be untested with reachedByUrl on every view they appear on. */
   reachedByUrl?: string[];
   /** Exact scored element keys per view: no phantoms (busy labels, file names), no duplicates. */
-  elements?: Record<string, string[]>;
-  /** Exact tested element keys per view, for keys that appear on more than one view. */
-  testedIn?: Record<string, string[]>;
+  elements: Record<string, string[]>;
+  /** Exact tested element keys per view. */
+  testedIn: Record<string, string[]>;
   /** Synthetic field values and URL parameters that may never appear in artifacts. */
   privateMarkers?: string[];
   /** Exact element path per view and key (paths are for humans; they must read right). */
@@ -26,7 +30,7 @@ interface GroundTruth {
   seen?: Record<string, Record<string, number>>;
   /** Elements that must be "not applicable: never enabled", outside the score. */
   neverEnabled?: string[];
-  proof: Record<string, Record<string, string>>;
+  proof: Record<string, Record<string, MutantOutcome>>;
   /** Exact set of faults the planner rules out as "already failing in baseline", per endpoint. */
   alreadyFailing?: Record<string, string[]>;
   weakestTest: string;
@@ -46,6 +50,19 @@ export function checkArtifactPrivacy(expected: GroundTruth, artifacts: Record<st
   return failures;
 }
 
+function checkNumbers<K extends string>(
+  failures: string[], section: string, expected: Record<K, number>, actual: Record<NoInfer<K>, number>,
+): void {
+  for (const key of Object.keys(expected) as K[]) {
+    if (actual[key] !== expected[key]) failures.push(`${section}: ${key} expected ${expected[key]}, got ${actual[key]}`);
+  }
+}
+
+function faultLabel({ mutant }: MutantResult): string {
+  // The expectations are shared by local runs regardless of the demo server origin.
+  return `${mutant.method} ${new URL(mutant.pattern).pathname} ${mutant.operator}`;
+}
+
 /** Returns one line per disagreement; empty means the output matches ground truth. */
 export function compareWithGroundTruth(
   expected: GroundTruth,
@@ -53,13 +70,31 @@ export function compareWithGroundTruth(
   proof: ProofSummary | undefined,
 ): string[] {
   const failures: string[] = [];
+  if (coverage) {
+    checkNumbers(failures, 'coverage', expected.coverage.counts, coverage);
+    let neverEnabled = 0;
+    for (const view of coverage.views) {
+      checkNumbers(failures, `coverage ${view.view}`, {
+        tested: view.elements.filter((element) => element.tested).length,
+        total: view.elements.length,
+      }, view);
+      neverEnabled += view.neverEnabled.length;
+    }
+    if (neverEnabled !== expected.coverage.counts.neverEnabled) {
+      failures.push(`coverage: never enabled inventory expected ${expected.coverage.counts.neverEnabled}, got ${neverEnabled}`);
+    }
+  }
   if (coverage && expected.testsExcluded !== undefined && coverage.testsExcluded !== expected.testsExcluded) {
     failures.push(`coverage: testsExcluded expected ${expected.testsExcluded}, got ${coverage.testsExcluded}`);
   }
-  if (coverage && expected.views) {
+  if (coverage) {
     const got = coverage.views.map((v) => v.view).sort();
     const want = [...expected.views].sort();
     if (got.join('\n') !== want.join('\n')) failures.push(`coverage: views expected [${want.join(', ')}], got [${got.join(', ')}]`);
+    for (const view of want) {
+      if (!Object.hasOwn(expected.elements, view)) failures.push(`coverage: no expected inventory for ${view}`);
+      if (!Object.hasOwn(expected.testedIn, view)) failures.push(`coverage: no expected tested controls for ${view}`);
+    }
   }
   if (coverage && expected.reachedByUrl) {
     for (const key of expected.reachedByUrl) {
@@ -68,7 +103,7 @@ export function compareWithGroundTruth(
       else if (els.some((e) => e.tested || !e.reachedByUrl)) failures.push(`coverage: "${key}" should be untested with reachedByUrl`);
     }
   }
-  if (coverage && expected.elements) {
+  if (coverage) {
     for (const [view, keys] of Object.entries(expected.elements)) {
       const v = coverage.views.find((x) => x.view === view);
       const got = (v?.elements ?? []).map((e) => e.key).sort();
@@ -76,7 +111,7 @@ export function compareWithGroundTruth(
       if (got.join('\n') !== want.join('\n')) failures.push(`coverage: ${view} elements expected [${want.join(', ')}], got [${got.join(', ')}]`);
     }
   }
-  if (coverage && expected.testedIn) {
+  if (coverage) {
     for (const [view, keys] of Object.entries(expected.testedIn)) {
       const v = coverage.views.find((x) => x.view === view);
       const got = (v?.elements ?? []).filter((e) => e.tested).map((e) => e.key).sort();
@@ -121,16 +156,40 @@ export function compareWithGroundTruth(
     }
   }
   if (proof) {
+    const expectedFaults = new Map<string, MutantOutcome>();
     for (const [endpoint, ops] of Object.entries(expected.proof)) {
       for (const [op, outcome] of Object.entries(ops)) {
-        const r = proof.results.find((x) => `${x.mutant.method} ${new URL(x.mutant.pattern).pathname}` === endpoint && x.mutant.operator === op);
-        if (!r) failures.push(`proof: no mutant for ${endpoint} ${op}`);
-        else if (r.outcome !== outcome) failures.push(`proof: ${endpoint} ${op} expected ${outcome}, got ${r.outcome}`);
+        expectedFaults.set(`${endpoint} ${op}`, outcome);
       }
     }
+    const seen = new Set<string>();
+    for (const result of proof.results) {
+      const label = faultLabel(result);
+      if (seen.has(label)) failures.push(`proof: duplicate mutant for ${label}`);
+      seen.add(label);
+      const outcome = expectedFaults.get(label);
+      if (outcome === undefined) failures.push(`proof: unexpected mutant for ${label}`);
+      else if (result.outcome !== outcome) failures.push(`proof: ${label} expected ${outcome}, got ${result.outcome}`);
+    }
+    for (const label of expectedFaults.keys()) {
+      if (!seen.has(label)) failures.push(`proof: no mutant for ${label}`);
+    }
+    const outcomes = [...expectedFaults.values()];
+    const count = (outcome: MutantOutcome) => outcomes.filter((value) => value === outcome).length;
+    const killed = count('killed');
+    const survived = count('survived');
+    const judged = killed + survived;
+    checkNumbers(failures, 'proof', {
+      killed,
+      survived,
+      unstable: count('unstable'),
+      notReached: count('not-reached'),
+      notApplicable: count('not-applicable'),
+      errors: count('error'),
+      score: judged ? Math.round((killed / judged) * 1000) / 10 : 0,
+    }, proof);
     if (expected.alreadyFailing) {
-      const label = (r: ProofSummary['results'][number]) => `${r.mutant.method} ${new URL(r.mutant.pattern).pathname} ${r.mutant.operator}`;
-      const got = proof.results.filter((r) => r.reason?.startsWith('already failing in baseline')).map(label).sort();
+      const got = proof.results.filter((r) => r.reason?.startsWith('already failing in baseline')).map(faultLabel).sort();
       const want = Object.entries(expected.alreadyFailing).flatMap(([ep, ops]) => ops.map((op) => `${ep} ${op}`)).sort();
       if (got.join('\n') !== want.join('\n')) failures.push(`proof: already failing in baseline expected [${want.join(', ')}], got [${got.join(', ')}]`);
     }
