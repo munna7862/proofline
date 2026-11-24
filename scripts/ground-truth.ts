@@ -18,6 +18,8 @@ interface GroundTruth {
   elements?: Record<string, string[]>;
   /** Exact tested element keys per view, for keys that appear on more than one view. */
   testedIn?: Record<string, string[]>;
+  /** Synthetic field values and URL parameters that may never appear in artifacts. */
+  privateMarkers?: string[];
   /** Exact element path per view and key (paths are for humans; they must read right). */
   paths?: Record<string, Record<string, string>>;
   /** Collapsed list elements per view and key, with how many distinct items they stand for. */
@@ -32,6 +34,16 @@ interface GroundTruth {
 
 export function loadGroundTruth(): GroundTruth {
   return JSON.parse(readFileSync(new URL('../demo/expected.json', import.meta.url), 'utf8')) as GroundTruth;
+}
+
+export function checkArtifactPrivacy(expected: GroundTruth, artifacts: Record<string, string>): string[] {
+  const failures: string[] = [];
+  for (const [name, content] of Object.entries(artifacts)) {
+    if (expected.privateMarkers?.some((marker) => content.includes(marker))) {
+      failures.push(`privacy: ${name} contains a synthetic private value`);
+    }
+  }
+  return failures;
 }
 
 /** Returns one line per disagreement; empty means the output matches ground truth. */

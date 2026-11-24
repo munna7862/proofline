@@ -17,7 +17,7 @@ import { renderReport } from '../src/report/html.ts';
 import { renderMarkdown } from '../src/report/markdown.ts';
 import { startShop } from '../demo/shop/server.ts';
 import { ensureDir } from '../src/util/store.ts';
-import { compareWithGroundTruth, loadGroundTruth } from './ground-truth.ts';
+import { checkArtifactPrivacy, compareWithGroundTruth, loadGroundTruth } from './ground-truth.ts';
 import { writeFileSync } from 'node:fs';
 import type { MutantHitRecord, MutantResult, TestCoverageRecord, TestNetworkRecord, TestRef } from '../src/types.ts';
 
@@ -39,6 +39,18 @@ type DemoTest = TestRef & { start?: string; expectFail?: boolean; body: (page: P
 /** Invocations of the flaky tips test; reset before the normal run, like tips.spec.ts's counter file. */
 let tipRuns = 0;
 const tests: DemoTest[] = [
+  {
+    testId: 'd1', title: 'draft editor accepts text without using it as a control label',
+    file: 'demo/tests/drafts.spec.ts', line: 3, start: '/settings/drafts#/editor?draft=ProoflineRouteMarker',
+    body: async (page) => {
+      await page.locator('#note').fill('ProoflineEditorMarker', { timeout: 2000 });
+      await page.locator('#plain-note').fill('ProoflinePlainEditorMarker', { timeout: 2000 });
+      await page.getByRole('button', { name: 'Reject' }).click({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Lock draft' }).click({ timeout: 2000 });
+      if ((await page.locator('#note').getAttribute('contenteditable')) !== 'false') throw new Error('draft unlocked');
+      await page.locator('#preview').click({ timeout: 2000 });
+    },
+  },
   {
     testId: 't1', title: 'shows products with prices', file: 'demo/tests/shop.spec.ts', line: 15,
     body: async (page) => {
@@ -164,7 +176,8 @@ async function main() {
       const status = await runTest(ctx, t);
       await flushCoverage(ctx);
       await ctx.close();
-      const { body, ...ref } = t;
+      const { testId, title, file, line } = t;
+      const ref = { testId, title, file, line };
       coverageRecords.push(cov.toRecord({ ...ref, status }));
       baseline.push({ ...ref, status, endpoints: net.endpoints() });
       if (status !== 'passed' && !t.expectFail) failures.push(`baseline: "${t.title}" should pass but ${status}`);
@@ -202,13 +215,23 @@ async function main() {
 
     // ---- Write the report exactly as users will see it ----
     ensureDir(`${OUT}/report`);
-    writeFileSync(`${OUT}/report/index.html`, renderReport({ project: 'demo-shop', coverage, proof }));
-    writeFileSync(`${OUT}/report/summary.md`, renderMarkdown(coverage, proof));
-    writeFileSync(`${OUT}/report/coverage-summary.json`, JSON.stringify(coverage, null, 2));
-    writeFileSync(`${OUT}/report/proof-summary.json`, JSON.stringify(proof, null, 2));
+    const artifacts = {
+      'index.html': renderReport({ project: 'demo-shop', coverage, proof }),
+      'summary.md': renderMarkdown(coverage, proof),
+      'coverage-summary.json': JSON.stringify(coverage, null, 2),
+      'proof-summary.json': JSON.stringify(proof, null, 2),
+    };
+    for (const [name, content] of Object.entries(artifacts)) {
+      writeFileSync(`${OUT}/report/${name}`, content);
+    }
 
     // ---- Compare with ground truth ----
-    failures.push(...compareWithGroundTruth(loadGroundTruth(), coverage, proof));
+    const expected = loadGroundTruth();
+    failures.push(...compareWithGroundTruth(expected, coverage, proof));
+    failures.push(...checkArtifactPrivacy(expected, {
+      ...artifacts,
+      'raw coverage records': JSON.stringify(coverageRecords),
+    }));
 
     console.log(`UI coverage ${coverage.score}% (${coverage.tested}/${coverage.total}) | Fault check ${proof.score}% (${proof.killed} caught, ${proof.survived} slipped, ${proof.unstable ? `${proof.unstable} unstable, ` : ''}${proof.notApplicable} n/a)`);
     console.log(`Report: ${OUT}/report/index.html`);

@@ -6,14 +6,16 @@
   },
   "testsExcluded": 1,
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/help", "/help/faq", "/community"],
+  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/help", "/help/faq", "/community"],
   "elements": {
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
+    "/settings/drafts#/editor": ["generic|note|", "generic|Plain note|", "generic|rich-note|", "button|Accept|", "button|Reject|", "button|Lock draft|", "button|Preview|", "link||", "link|Draft view|"],
     "/help": ["button|Open FAQ|", "link|Help home|"],
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
     "/community": ["button|Join community|", "link|in list|ul#posts > li > a"]
   },
-  "testedIn": {"/community": ["button|Join community|", "link|in list|ul#posts > li > a"], "/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
+  "testedIn": {"/settings/drafts#/editor": ["generic|note|", "generic|Plain note|", "button|Reject|", "button|Lock draft|", "button|Preview|"], "/community": ["button|Join community|", "link|in list|ul#posts > li > a"], "/help": ["button|Open FAQ|"], "/help/faq": ["button|Was this helpful?|", "link|Help home|"]},
+  "privateMarkers": ["ProoflineEditorMarker", "ProoflinePlainEditorMarker", "ProoflineRouteMarker", "ProoflineLinkMarker", "ProoflineDraftLinkPathMarker", "ProoflineDraftLinkTextMarker"],
   "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},
   "seen": {"/community": {"link|in list|ul#posts > li > a": 5}},
   "neverEnabled": ["button|Processing...|"],

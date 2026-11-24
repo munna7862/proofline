@@ -16,6 +16,7 @@
 export interface AgentOptions {
   bindingName: string;
   interactiveSelector: string;
+  editableSelector: string;
   /** Elements inside a match are never inventoried or counted (dev-only overlays, toasts). */
   ignoreSelector: string;
   /** List item selector (LIST_ITEMS): elements inside one carry a `list` signature. */
@@ -64,6 +65,8 @@ export const LIVE_REGIONS = [
 /** List items whose interactive children are siblings of each other (see ElementInfo.list). */
 export const LIST_ITEMS = 'li,[role=listitem],tr,[role=row]';
 
+export const EDITABLE_SELECTOR = '[contenteditable=""],[contenteditable="true" i],[contenteditable="plaintext-only" i]';
+
 export const INTERACTIVE_SELECTOR = [
   'a[href]',
   'button',
@@ -71,8 +74,7 @@ export const INTERACTIVE_SELECTOR = [
   'select',
   'textarea',
   'summary',
-  '[contenteditable=""]',
-  '[contenteditable="true"]',
+  EDITABLE_SELECTOR,
   '[role=button]',
   '[role=link]',
   '[role=checkbox]',
@@ -126,7 +128,7 @@ export function proofAgent(opts: AgentOptions): void {
     try {
       const u = new URL(href, location.href);
       let key = normalizePath(u.pathname);
-      if (u.hash.startsWith('#/')) key += '#' + normalizePath(u.hash.slice(1));
+      if (u.hash.startsWith('#/')) key += '#' + normalizePath(u.hash.slice(1).split(/[?#]/, 1)[0]!);
       return key;
     } catch {
       return '/';
@@ -154,14 +156,39 @@ export function proofAgent(opts: AgentOptions): void {
     return 'generic';
   };
 
-  // Form fields hold what the user typed or picked (a search term, C:\fakepath\photo.png),
-  // so their value and text are never a name: label, then name/id, then placeholder.
+  const editingHosts = new WeakSet<Element>();
+  const isEditingHost = (el: Element) => {
+    if (el.matches(opts.editableSelector)) editingHosts.add(el);
+    return editingHosts.has(el);
+  };
+
+  const isDraftContent = (el: Element) => {
+    for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+      if (isEditingHost(cur)) return true;
+      if (cur.getAttribute('contenteditable')?.toLowerCase() === 'false') return false;
+    }
+    return false;
+  };
+
+  // User-entered values are not labels. Contenteditable stores its value in DOM text.
   const isField = (el: Element) => {
+    if (isDraftContent(el)) return true;
     const tag = el.tagName;
     if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
     if (tag !== 'INPUT') return false;
     const t = ((el as HTMLInputElement).type || 'text').toLowerCase();
     return t !== 'submit' && t !== 'button' && t !== 'reset' && t !== 'image';
+  };
+
+  const labelText = (el: Element, rendered = false): string => {
+    if (isDraftContent(el)) return '';
+    if (!Array.from(el.getElementsByTagName('*')).some(isEditingHost)) {
+      return (rendered && (el as HTMLElement).innerText) || el.textContent || '';
+    }
+    // Drop editable subtrees even when a surrounding control or aria-labelledby supplies the name.
+    return Array.from(el.childNodes, (node) =>
+      node instanceof Element ? labelText(node, rendered) : node.nodeType === 3 ? node.textContent : '',
+    ).join('');
   };
 
   const nameOf = (el: Element) => {
@@ -171,22 +198,28 @@ export function proofAgent(opts: AgentOptions): void {
     if (labelledBy) {
       const t = labelledBy
         .split(/\s+/)
-        .map((id) => document.getElementById(id)?.textContent || '')
+        .map((id) => {
+          const label = document.getElementById(id);
+          return label ? labelText(label) : '';
+        })
         .join(' ');
       if (t.trim()) return clean(t);
     }
     const labels = (el as HTMLInputElement).labels;
-    if (labels && labels.length) return clean(Array.from(labels).map((l) => l.textContent).join(' '));
+    if (labels && labels.length) {
+      const label = clean(Array.from(labels, (l) => labelText(l)).join(' '));
+      if (label) return label;
+    }
     if (isField(el)) {
       return clean(
-        el.getAttribute('name') || el.id || el.getAttribute('placeholder') || el.getAttribute('title') || '',
+        el.getAttribute('name') || el.getAttribute('id') || el.getAttribute('placeholder') || el.getAttribute('title') || '',
       );
     }
     const ph = el.getAttribute('placeholder');
     if (ph) return clean(ph);
     const title = el.getAttribute('title') || el.getAttribute('alt');
     if (title) return clean(title);
-    const text = (el as HTMLElement).innerText || el.textContent;
+    const text = labelText(el, true);
     if (text && text.trim()) return clean(text);
     // Button-like inputs (submit, button, reset) are labelled by their value.
     const val = (el as HTMLInputElement).value;
@@ -250,7 +283,7 @@ export function proofAgent(opts: AgentOptions): void {
     const role = roleOf(el);
     const name = nameOf(el);
     const testId = testIdOf(el);
-    const href = el.tagName === 'A' ? viewOf((el as HTMLAnchorElement).href) : undefined;
+    const href = el.tagName === 'A' && !isDraftContent(el) ? viewOf((el as HTMLAnchorElement).href) : undefined;
     const list = listOf(el);
     return {
       key: [role, name, testId || ''].join('|'),
@@ -295,7 +328,7 @@ export function proofAgent(opts: AgentOptions): void {
 
   const onUrlChange = () => {
     const view = viewOf(location.href);
-    emit({ type: 'view', view, url: location.href });
+    emit({ type: 'view', view });
     if (view !== currentView) {
       currentView = view;
       carried = new WeakSet();
@@ -311,6 +344,8 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const scan = (final = false) => {
+    // Track hosts even when they are hidden or later lose the contenteditable attribute.
+    document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     const view = viewOf(location.href);
     const seen = (seenPerView[view] = seenPerView[view] || {});
     const fresh: any[] = [];
@@ -387,13 +422,24 @@ export function proofAgent(opts: AgentOptions): void {
 
   const start = () => {
     currentView = viewOf(location.href);
-    emit({ type: 'view', view: currentView, url: location.href });
+    emit({ type: 'view', view: currentView });
     scan();
-    new MutationObserver(scheduleScan).observe(document.documentElement, {
+    new MutationObserver((changes) => {
+      for (const change of changes) {
+        if (change.attributeName !== 'contenteditable') continue;
+        const target = change.target as Element;
+        const previous = change.oldValue?.toLowerCase();
+        // A toggle can complete before the next scan. Keep treating its retained text as a draft.
+        if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
+        isEditingHost(target);
+      }
+      scheduleScan();
+    }).observe(document.documentElement, {
       subtree: true,
       childList: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy'],
+      attributeOldValue: true,
+      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable'],
     });
   };
 
