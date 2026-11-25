@@ -164,6 +164,67 @@ render();
 </script>
 </body></html>`;
 
+const FLOW_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fast flow</title></head><body>
+<header><nav><a href="/">Back to shop</a><button id="retired">Old navigation</button><div id="flow-draft" role="button">Temporary notes</div><span id="fade"><button>More options</button></span></nav></header>
+<header><input id="flow-input" type="button" value="Native action"><div id="flow-custom" role="button">Custom action</div></header>
+<main><button id="start">Start flow</button></main>
+<script>
+const main = document.querySelector('main');
+document.getElementById('start').addEventListener('click', () => {
+  history.pushState(null, '', '/flow/intermediate');
+  document.getElementById('fade').style.opacity = '0';
+  main.innerHTML = '<button id="continue">Continue flow</button>';
+  document.getElementById('continue').addEventListener('click', () => {
+    const draft = document.getElementById('flow-draft');
+    draft.contentEditable = 'true';
+    draft.textContent = 'ProoflineFastViewDraftMarker';
+    draft.contentEditable = 'false';
+    const input = document.getElementById('flow-input');
+    input.type = 'text';
+    input.value = 'ProoflineFastViewInputMarker';
+    input.type = 'button';
+    const custom = document.getElementById('flow-custom');
+    custom.setAttribute('role', 'textbox');
+    custom.textContent = 'ProoflineFastViewRoleMarker';
+    custom.setAttribute('role', 'button');
+    history.pushState(null, '', '/flow/done');
+    input.value = 'Native action';
+    custom.textContent = 'Custom action';
+    document.getElementById('retired').remove();
+    document.getElementById('fade').style.opacity = '1';
+    main.textContent = 'Flow complete';
+    // Leave after the route hold, before its debounced scan.
+    setTimeout(() => history.pushState(null, '', '/flow/end'), 700);
+  });
+});
+</script>
+</body></html>`;
+
+const BOOTSTRAP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Bootstrap</title></head><body>
+<header><div id="draft" role="button">Working</div></header>
+<script>
+const draft = document.getElementById('draft');
+history.pushState(null, '', '/bootstrap/transient');
+draft.contentEditable = 'true';
+draft.textContent = 'ProoflineBootstrapDraftMarker';
+draft.contentEditable = 'false';
+history.replaceState(null, '', '/bootstrap/ready');
+draft.textContent = 'Working';
+</script>
+</body></html>`;
+
+const AUTO_FLOW_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Automatic flow</title></head><body>
+<header><nav><a href="/">Back to shop</a></nav></header>
+<button id="launch">Start quick flow</button>
+<script>
+document.getElementById('launch').addEventListener('click', (event) => {
+  history.pushState(null, '', '/flow/auto-preview');
+  event.currentTarget.remove();
+  setTimeout(() => history.replaceState(null, '', '/flow/auto-complete'), 210);
+});
+</script>
+</body></html>`;
+
 const CHECKOUT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Checkout</title></head><body>
 <h1>Checkout</h1>
 <a href="/cart" id="checkout-link" aria-label="Checkout link"><button type="button" id="checkout">Proceed to checkout</button><span data-focus-guard tabindex="0"></span><button hidden>Hidden option</button></a>
@@ -318,6 +379,9 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
     if (url.pathname === '/settings/menu') return res.end(MENU_PAGE);
     if (url.pathname === '/checkout/form') return res.end(CHECKOUT_PAGE);
+    if (url.pathname === '/flow/start') return res.end(FLOW_PAGE);
+    if (url.pathname === '/flow/auto') return res.end(AUTO_FLOW_PAGE);
+    if (url.pathname === '/bootstrap/start') return res.end(BOOTSTRAP_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {

@@ -128,6 +128,32 @@ const tests: DemoTest[] = [
       await eventually(async () => page.getByRole('button', { name: 'Upload' }).isEnabled(), 'upload enabled again');
     },
   },
+  // demo/tests/fast-flow.spec.ts: shared navigation on a fast intermediate view.
+  {
+    testId: 'flow', title: 'completes a fast intermediate view',
+    file: 'demo/tests/fast-flow.spec.ts', line: 3, start: '/flow/start',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Start flow' }).click({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Continue flow' }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, 'main')) === 'Flow complete', 'flow complete');
+      await eventually(async () => new URL(page.url()).pathname === '/flow/end', 'flow final view');
+    },
+  },
+  {
+    testId: 'bootstrap', title: 'waits for the app to finish bootstrapping',
+    file: 'demo/tests/fast-flow.spec.ts', line: 11, start: '/bootstrap/start',
+    body: async (page) => {
+      await eventually(async () => new URL(page.url()).pathname === '/bootstrap/ready', 'bootstrap ready');
+      await page.getByRole('button', { name: 'Working' }).waitFor({ timeout: 2000 });
+    },
+  },
+  {
+    testId: 'automatic-flow', title: 'starts an automatic transition as the test ends',
+    file: 'demo/tests/fast-flow.spec.ts', line: 17, start: '/flow/auto',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Start quick flow' }).click({ timeout: 2000 });
+    },
+  },
   // demo/tests/help.spec.ts: the old view lingers after a client-side route change (no route bleed)
   {
     testId: 'h1', title: 'faq feedback is thanked', file: 'demo/tests/help.spec.ts', line: 11, start: '/help',
