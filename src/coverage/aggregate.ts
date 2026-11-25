@@ -3,17 +3,36 @@ import type { CoverageSummary, ElementCoverage, ElementInfo, TestCoverageRecord,
 /** Minimum number of distinct per-test values before a path segment becomes :param. */
 const LEARNED_PARAM_MIN_VALUES = 3;
 
+function firstPathSegments(segments: string[]): Set<number> {
+  const first = new Set([segments.findIndex(Boolean)]);
+  const hash = segments.indexOf('#');
+  if (hash !== -1) first.add(segments.findIndex((segment, index) => index > hash && !!segment));
+  return first;
+}
+
+// Keep the hash boundary separate so the final pathname segment can be learned too.
+const splitViewPath = (view: string) => view.replace('#/', '/#/').split('/');
+const restoreHashBoundary = (path: string) => path.replace('/#/', '#/');
+
+function canLearnSegment(segment: string, first: boolean): boolean {
+  if (!segment || segment.startsWith(':') || segment.includes('#')) return false;
+  if (!first) return true;
+  try {
+    // URL.pathname encodes characters such as é as percent escapes that contain digits.
+    const decoded = decodeURIComponent(segment);
+    return /\d/.test(decoded) || Array.from(decoded).length >= 20;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Learns per-test path segments in view keys (faker usernames, slugs a test creates)
- * and maps each such view to one with the segment replaced by `:param`.
+ * Learns per-test path segments from views with the same parent and suffix.
  *
- * A segment position collapses when, for the same surrounding path, at least 3 values
- * qualify, coming from at least 3 different tests. A value qualifies when:
- *  - exactly one test visited that view, and
- *  - it is not a fixed link: no link to that view appears in the inventory of 2+ tests
- *    (a nav menu listing /docs/intro, /docs/api, /docs/faq keeps those pages apart).
- * Values that do not qualify keep their own view. Already-normalized segments (:id,
- * :uuid, :hash) and the hash-router marker segment are never touched.
+ * Three distinct values from three single-test visits establish the position.
+ * Shared links do not provide evidence. The learned position applies across suffixes,
+ * including user home pages, while shared sibling branches with no qualifying
+ * evidence keep their literal names.
  * Pure and deterministic: the result depends only on the records, not their order.
  */
 export function learnViewParams(records: TestCoverageRecord[]): Map<string, string> {
@@ -34,35 +53,48 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
     }
   }
 
-  // pattern (segments with one position blanked) -> qualifying views at that position
-  const groups = new Map<string, { index: number; views: string[] }>();
-  for (const view of [...visitors.keys()].sort()) {
+  const paths = [...visitors.keys()].sort().map((view) => {
+    const segments = splitViewPath(view);
+    return { view, segments, first: firstPathSegments(segments) };
+  });
+  const groups = new Map<string, { parent: string; examples: Map<string, string> }>();
+  const isSharedLink = (view: string) => (linkedBy.get(view)?.size ?? 0) >= 2;
+  for (const { view, segments, first } of paths) {
     const tests = visitors.get(view)!;
-    if (tests.size !== 1 || (linkedBy.get(view)?.size ?? 0) >= 2) continue;
-    const segs = view.split('/');
-    segs.forEach((seg, i) => {
-      if (seg === '' || seg.startsWith(':') || seg.includes('#')) return;
-      const pattern = segs.map((s, j) => (j === i ? '\0' : s)).join('/');
-      const g = groups.get(pattern) ?? { index: i, views: [] };
-      g.views.push(view);
-      groups.set(pattern, g);
+    if (tests.size !== 1 || isSharedLink(view)) continue;
+    segments.forEach((segment, index) => {
+      if (!canLearnSegment(segment, first.has(index))) return;
+      const parent = segments.slice(0, index).join('/');
+      if (isSharedLink(restoreHashBoundary(`${parent}/${segment}`))) return;
+      const pattern = JSON.stringify([parent, segments.slice(index + 1)]);
+      const group = groups.get(pattern) ?? { parent, examples: new Map<string, string>() };
+      group.examples.set(segment, [...tests][0]!);
+      groups.set(pattern, group);
     });
   }
 
-  const collapse = new Map<string, Set<number>>();
-  for (const g of groups.values()) {
-    const tests = new Set(g.views.map((v) => [...visitors.get(v)!][0]));
-    if (g.views.length < LEARNED_PARAM_MIN_VALUES || tests.size < LEARNED_PARAM_MIN_VALUES) continue;
-    for (const v of g.views) {
-      const at = collapse.get(v) ?? new Set<number>();
-      at.add(g.index);
-      collapse.set(v, at);
-    }
+  const learnedParents = new Map<string, Set<string>>();
+  for (const { parent, examples } of groups.values()) {
+    if (new Set(examples.values()).size < LEARNED_PARAM_MIN_VALUES) continue;
+    const values = learnedParents.get(parent) ?? new Set<string>();
+    for (const segment of examples.keys()) values.add(segment);
+    learnedParents.set(parent, values);
   }
 
   const out = new Map<string, string>();
-  for (const [view, at] of collapse) {
-    out.set(view, view.split('/').map((s, i) => (at.has(i) ? ':param' : s)).join('/'));
+  for (const { view, segments, first } of paths) {
+    if (isSharedLink(view)) continue;
+    const mapped = segments.map((segment, index) => {
+      if (!canLearnSegment(segment, first.has(index))) return segment;
+      const parent = segments.slice(0, index).join('/');
+      const learnedValues = learnedParents.get(parent);
+      if (!learnedValues) return segment;
+      const branch = restoreHashBoundary(`${parent}/${segment}`);
+      const sharedBranch = isSharedLink(branch) || (visitors.get(branch)?.size ?? 0) >= 2;
+      return sharedBranch && !learnedValues.has(segment) ? segment : ':param';
+    }).join('/');
+    const mappedView = restoreHashBoundary(mapped);
+    if (mappedView !== view) out.set(view, mappedView);
   }
   return out;
 }

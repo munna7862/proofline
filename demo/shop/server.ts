@@ -223,7 +223,7 @@ document.querySelectorAll('#posts a').forEach((a) => a.addEventListener('click',
 // Tip of the day from GET /api/tips. The page marks data-state="ok" on any successful response,
 // even an empty tip, so a test that only checks the state lets "Missing text" through.
 const TIPS_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Tips</title></head><body>
-<h1>Tip of the day</h1><p id="tip" data-state="loading"></p>
+<h1>Tip of the day</h1><p id="tip" data-state="loading"></p><a href="/">Back to shop</a>
 <script>
 const tip = document.getElementById('tip');
 fetch('/api/tips').then((res) => res.ok ? res.json() : Promise.reject(new Error('status ' + res.status)))
@@ -299,10 +299,12 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
 <nav id="user-links"><a href="/about" onclick="event.preventDefault()">${username}'s notes</a><a href="/">Back to shop</a></nav>
 </body></html>`);
     }
-    if (url.pathname === '/help/tips') return res.end(TIPS_PAGE);
+    if (url.pathname === '/tips') return res.end(TIPS_PAGE);
     if (url.pathname === '/outage') return res.end(OUTAGE_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);
     if (user) return res.end(profilePage(user[1]!));
+    if (/^\/users\/[a-z_]+\/notes$/.test(url.pathname)) return res.end(simplePage('User notes'));
+    if (/^\/users\/[a-z_]+\/notes\/new$/.test(url.pathname)) return res.end(simplePage('New note'));
     // Notes are addressed by a cuid, as in Prisma-backed apps.
     if (/^\/notes\/c[a-z0-9]{24}$/.test(url.pathname)) return res.end(simplePage('Note'));
     res.writeHead(404);
