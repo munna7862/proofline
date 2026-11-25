@@ -49,6 +49,8 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 S4-T3 done. Ordinary first segments stay literal and learned parameters carry into user home pages and deeper routes. The tips page and two notes views add three untouched links. Verify passed with 64 of 64 unit tests and calibration reporting `UI coverage 51.4% (19/37) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 - 2026-11-25 S4-T3 review follow-up. Fixed destinations linked by multiple tests keep their views, and first-segment protection covers encoded names and hash routes. Verify passed with 68 of 68 unit tests and calibration reporting `UI coverage 51.4% (19/37) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`. The Windows Playwright coverage report matched exact ground truth after the fixes.
 
+- 2026-11-25 S4-T5 done. The checkout demo adds six controls, four tested, including the single-control wrapper and the renamed password field. The two-control wrapper remains untouched. Verify passed with 71 of 71 unit tests and calibration reporting `UI coverage 53.5% (23/43) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):
 

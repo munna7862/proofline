@@ -164,6 +164,27 @@ render();
 </script>
 </body></html>`;
 
+const CHECKOUT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Checkout</title></head><body>
+<h1>Checkout</h1>
+<a href="/cart" id="checkout-link" aria-label="Checkout link"><button type="button" id="checkout">Proceed to checkout</button></a>
+<a href="/about" id="options-link" aria-label="Options link"><button type="button" id="edit">Edit</button><button type="button" id="cancel">Cancel</button></a>
+<label for="checkout-password">Password</label>
+<input name="initial_password" type="password">
+<p id="selection"></p>
+<script>
+for (const link of document.querySelectorAll('a')) {
+  link.addEventListener('click', (event) => { event.preventDefault(); });
+}
+document.getElementById('checkout').addEventListener('click', () => {
+  document.getElementById('selection').textContent = 'Checkout selected';
+});
+document.getElementById('edit').addEventListener('click', () => {
+  document.getElementById('selection').textContent = 'Editing options';
+});
+setTimeout(() => { document.querySelector('input').id = 'checkout-password'; }, 300);
+</script>
+</body></html>`;
+
 // The menu opens on pointerdown and makes the rest of the page pointer-inert
 // before pointerup, so a click never reaches the trigger.
 const MENU_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Menu</title></head><body>
@@ -291,6 +312,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
     if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
     if (url.pathname === '/settings/menu') return res.end(MENU_PAGE);
+    if (url.pathname === '/checkout/form') return res.end(CHECKOUT_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {

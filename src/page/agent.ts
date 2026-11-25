@@ -316,6 +316,37 @@ export function proofAgent(opts: AgentOptions): void {
 
   // key -> 'enabled' | 'disabled'. A key first seen disabled is sent again once it is seen enabled.
   const seenPerView: Record<string, Record<string, string>> = {};
+  type FieldState = { key: string; enabled: boolean };
+  const fields = new WeakMap<Element, { id: string; views: Map<string, FieldState> }>();
+  let documentId: string | undefined;
+  let nextField = 0;
+
+  const observe = (el: Element, view: string) => {
+    const element = describe(el);
+    const enabled = !element.disabled;
+    if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && isField(el)) {
+      let field = fields.get(el);
+      if (!field) {
+        // A frame can navigate or another frame can observe the same view. Keep IDs
+        // distinct across documents, and strip them before writing the coverage record.
+        documentId ??= crypto.getRandomValues(new Uint32Array(4)).join('-');
+        field = { id: `${documentId}:${++nextField}`, views: new Map() };
+        fields.set(el, field);
+      }
+      const previous = field.views.get(view);
+      field.views.set(view, { key: element.key, enabled: enabled || !!previous?.enabled });
+      if (previous && previous.key !== element.key) {
+        emit({ type: 'rename', view, nodeId: field.id, element });
+        return { element, nodeId: field.id, fresh: false };
+      }
+      return { element, nodeId: field.id, fresh: !previous || (!previous.enabled && enabled) };
+    }
+    const seen = (seenPerView[view] = seenPerView[view] || {});
+    const state = enabled ? 'enabled' : 'disabled';
+    const fresh = seen[element.key] !== 'enabled' && seen[element.key] !== state;
+    if (fresh) seen[element.key] = state;
+    return { element, nodeId: undefined, fresh };
+  };
 
   // Route-transition bleed: after a client-side route change, the old view often stays mounted
   // for a moment (exit animations, late route swaps). Elements already on the page when the view
@@ -347,19 +378,14 @@ export function proofAgent(opts: AgentOptions): void {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
     document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     const view = viewOf(location.href);
-    const seen = (seenPerView[view] = seenPerView[view] || {});
     const fresh: any[] = [];
     const holding = !final && Date.now() - changedAt < HOLD_MS;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
       if (isIgnored(el)) return;
       if (!isVisible(el)) return;
-      const d = describe(el);
-      const state = d.disabled ? 'disabled' : 'enabled';
-      // grouping: same role+name+testid counts once per view
-      if (seen[d.key] === 'enabled' || seen[d.key] === state) return;
-      seen[d.key] = state;
-      fresh.push(d);
+      const entry = observe(el, view);
+      if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId });
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
   };
@@ -378,27 +404,37 @@ export function proofAgent(opts: AgentOptions): void {
     (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
     ((ev.target as HTMLInputElement).type || '').toLowerCase() === 'file';
 
+  const credit = (el: Element, view: string, event: string) => {
+    // The element the test just used is live in this view (even one held after a route change):
+    // record it now, before the test can navigate away ahead of the next scan, so every
+    // interaction has an inventory entry.
+    carried.delete(el);
+    const { element, nodeId, fresh } = observe(el, view);
+    if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId }] });
+    emit({ type: 'interaction', view, key: element.key, nodeId, event });
+  };
+
+  const isPointerTrigger = (el: Element) =>
+    el.matches('[aria-haspopup],[aria-expanded]') && !el.matches(':disabled');
+
   const onEvent = (ev: Event) => {
     if (!ev.isTrusted && !isFileFill(ev)) return;
     const target = ev.target as Element | null;
     if (!target || typeof (target as any).closest !== 'function') return;
     const el = target.closest(opts.interactiveSelector);
     if (!el || isIgnored(el)) return;
-    // Browsers can deliver pointerdown to a child of a disabled button even though clicks are suppressed.
-    if (ev.type === 'pointerdown' && (!el.matches('[aria-haspopup],[aria-expanded]') || el.matches(':disabled'))) return;
-    const d = describe(el);
+    // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
+    if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
     const view = viewOf(location.href);
-    // The element the test just used is live in this view (even one held after a route change):
-    // record it now, before the test can navigate away ahead of the next scan, so every
-    // interaction has an inventory entry.
-    carried.delete(el);
-    const seen = (seenPerView[view] = seenPerView[view] || {});
-    const state = d.disabled ? 'disabled' : 'enabled';
-    if (seen[d.key] !== 'enabled' && seen[d.key] !== state) {
-      seen[d.key] = state;
-      emit({ type: 'inventory', view, elements: [d] });
+    credit(el, view, ev.type);
+    if (ev.isTrusted) {
+      const wrapper = el.parentElement?.closest(opts.interactiveSelector);
+      if (wrapper && (roleOf(wrapper) === 'link' || roleOf(wrapper) === 'button') &&
+          !wrapper.matches(':disabled') && (ev.type !== 'pointerdown' || isPointerTrigger(wrapper)) &&
+          wrapper.querySelectorAll(opts.interactiveSelector).length === 1) {
+        credit(wrapper, view, ev.type);
+      }
     }
-    emit({ type: 'interaction', view, key: d.key, event: ev.type });
     scheduleScan();
   };
 
@@ -439,9 +475,12 @@ export function proofAgent(opts: AgentOptions): void {
     }).observe(document.documentElement, {
       subtree: true,
       childList: true,
+      characterData: true,
       attributes: true,
       attributeOldValue: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable'],
+      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable',
+        'id', 'name', 'type', 'for', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
+        'data-testid', 'data-test', 'data-cy'],
     });
   };
 
