@@ -137,6 +137,25 @@ const tests: DemoTest[] = [
       await eventually(async () => new URL(page.url()).pathname === '/help', 'back on help home');
     },
   },
+  // demo/tests/checkout.spec.ts: nested controls and a field whose label arrives after load
+  {
+    testId: 'checkout', title: 'uses nested checkout controls and the renamed password field',
+    file: 'demo/tests/checkout.spec.ts', line: 3, start: '/checkout/form',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Proceed to checkout' }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#selection')) === 'Checkout selected', 'checkout selected');
+      await page.getByRole('button', { name: 'Edit', exact: true }).click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#selection')) === 'Editing options', 'editing options');
+      await page.getByLabel('Password').fill('ProoflineCheckoutValueMarker', { timeout: 2000 });
+      await page.locator('#checkout-password').evaluate(async (input: HTMLInputElement) => {
+        input.type = 'submit';
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        input.type = 'password';
+      });
+      await page.getByRole('textbox', { name: 'Draft note' }).fill('ProoflineCheckoutNoteMarker', { timeout: 2000 });
+      await page.getByRole('textbox', { name: 'Order note' }).waitFor({ timeout: 2000 });
+    },
+  },
   // demo/tests/menu.spec.ts: modal menu and disclosure triggers receive pointerdown without a click
   {
     testId: 'm1', title: 'opens the user menu on pointerdown and selects an item',

@@ -21,8 +21,9 @@ export interface ElementInfo {
 
 export type AgentMessage =
   | { type: 'view'; view: string }
-  | { type: 'inventory'; view: string; elements: ElementInfo[] }
-  | { type: 'interaction'; view: string; key: string; event: string };
+  | { type: 'inventory'; view: string; elements: (ElementInfo & { nodeId?: string })[] }
+  | { type: 'rename'; view: string; nodeId: string; element: ElementInfo }
+  | { type: 'interaction'; view: string; key: string; event: string; nodeId?: string };
 
 /** Everything one test touched. Written per test to .proofline/raw/coverage/<testId>.json */
 export interface TestCoverageRecord {

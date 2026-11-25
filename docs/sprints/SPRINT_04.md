@@ -109,7 +109,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   Prompt:
   > Read AGENTS.md and the founder's decision for S4-T4. In src/coverage/aggregate.ts, count only records with status "passed" (records without a status still count); add testsExcluded to CoverageSummary and show "N tests failed; their coverage is not counted" in the HTML report, Markdown and reporter line. Add a demo test that fails after visiting a page nobody else visits, ground truth, and a unit test. Update docs/ARCHITECTURE.md. Run npm run calibrate (before/after line), npm run demo, npm run verify.
 
-- [ ] **S4-T5 Nested links and renamed fields (2 h)**
+- [x] **S4-T5 Nested links and renamed fields (2 h)**
   S4-5: on buggy-books, the "Proceed to Checkout" `<a>` wraps a `<button>`. The click credits only the button, although the documented rule is "an event on it (or inside it)".
   S4-6: `/login` records the password field twice. Once as `txt_pwd_#`, before the app sets its id, and once as "Password".
   Accept:
