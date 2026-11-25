@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregateCoverage, groupListItems, learnViewParams } from '../src/coverage/aggregate.ts';
-import type { TestCoverageRecord } from '../src/types.ts';
+import type { ElementInfo, TestCoverageRecord } from '../src/types.ts';
 
 const el = (role: string, name: string, href?: string) => ({ key: `${role}|${name}|`, tag: 'x', role, name, href, path: 'x' });
 
@@ -38,7 +38,7 @@ test('ignoreElements removes noise from the denominator', () => {
   assert.equal(aggregateCoverage(recs, { ignoreElements: ['Privacy'] }).total, 1);
 });
 
-const visit = (testId: string, view: string, els = [el('button', 'Follow')], clicked: string[] = []): TestCoverageRecord => ({
+const visit = (testId: string, view: string, els: ElementInfo[] = [el('button', 'Follow')], clicked: string[] = []): TestCoverageRecord => ({
   testId, title: testId.toUpperCase(), file: 'f', line: 1, views: [view], inventory: { [view]: els }, interactions: clicked.length ? { [view]: clicked } : {},
 });
 
@@ -139,6 +139,63 @@ test('list grouping is independent of input order and keeps the denominator stab
   // Different generated names in two runs give the same single element.
   const run2 = ['W', 'X', 'Y', 'Z', 'Q'].map((n) => item('link', n, 'ul > li > a'));
   assert.equal(groupListItems(run2)[0]!.key, groupListItems(items)[0]!.key);
+});
+
+test('per-test names group in one view and keep a shared name at the same path', () => {
+  const names = ['Asha', 'Ben', 'Chen'];
+  const records = names.map((name, i) => visit(
+    String(i), '/links', [el('link', name), el('link', 'Home')], i < 2 ? [`link|${name}|`] : [],
+  ));
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.deepEqual(elements.map((e) => e.key), ['link|Home|', 'link|per test|x']);
+  assert.deepEqual(elements[1], {
+    key: 'link|per test|x', name: 'per test (3 seen)', role: 'link', tag: 'x', path: 'x',
+    seen: 3, tested: true, testedBy: ['0', '1'],
+  });
+  assert.deepEqual(aggregateCoverage([...records].reverse()).views[0]!.elements, elements);
+});
+
+test('per-test grouping requires three single-test names at the same path, tag and role', () => {
+  const a = el('link', 'Asha');
+  const b = el('link', 'Ben');
+  const c = el('link', 'Chen');
+  const two = [visit('a', '/', [a]), visit('b', '/', [b])];
+  for (const records of [
+    two,
+    [...two, visit('c', '/', [{ ...c, path: 'other' }])],
+    [...two, visit('c', '/', [{ ...c, tag: 'a' }])],
+    [...two, visit('c', '/', [el('button', 'Chen')])],
+    [...two, visit('c', '/', [c, a])],
+    [visit('a', '/', [a]), visit('b', '/', [b]), visit('c', '/', [c, { ...a, key: 'link|Asha|other' }])],
+  ]) {
+    assert.ok(aggregateCoverage(records).views[0]!.elements.every((e) => e.seen === undefined));
+  }
+});
+
+test('per-test grouping counts distinct names even if a test sees more than one', () => {
+  const records = [
+    visit('a', '/', [el('link', 'Asha'), el('link', 'Ben')]),
+    visit('b', '/', [el('link', 'Chen')]),
+  ];
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.deepEqual(elements.map((e) => [e.key, e.seen]), [['link|per test|x', 3]]);
+});
+
+test('a label also seen on a disabled element stays separate', () => {
+  const records = ['Asha', 'Ben', 'Chen'].map((name) => visit(name, '/', [el('link', name)]));
+  records.push(visit('busy', '/', [{ ...off('link', 'Asha'), key: 'link|Asha|other' }]));
+  const coverage = aggregateCoverage(records);
+  assert.deepEqual(coverage.views[0]!.elements.map((e) => e.key), ['link|Asha|', 'link|Ben|', 'link|Chen|']);
+  assert.equal(coverage.neverEnabled, 1);
+});
+
+test('per-test grouping leaves existing list groups in place', () => {
+  const records = ['a', 'b', 'c'].map((testId) => visit(testId, '/', ['1', '2', '3'].map((n) =>
+    item('link', testId + n, `ul.${testId} > li > a`),
+  )));
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.equal(elements.length, 3);
+  assert.ok(elements.every((e) => e.name === 'in list (3 seen)'));
 });
 
 test('only passing tests count; a record with no status still counts', () => {

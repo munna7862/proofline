@@ -52,3 +52,22 @@ test('reports show repeated list items as one element with how many were seen', 
   assert.match(renderMarkdown(c), /link in list \(3 seen\)/);
   assert.match(renderReport({ project: 'p', coverage: c }), /<span class="role">link<\/span> in list \(3 seen\)/);
 });
+
+test('reports show grouped per-test names with how many were seen', () => {
+  const c = aggregateCoverage(['Asha', 'Ben', 'Chen'].map((name) => ({
+    testId: name, title: name, file: 'f', line: 1, views: ['/'],
+    inventory: { '/': [el('link', name, '/profile')] }, interactions: {},
+  })));
+  assert.match(renderMarkdown(c), /link per test \(3 seen\)/);
+  assert.match(renderReport({ project: 'p', coverage: c }), /<span class="role">link<\/span> per test \(3 seen\)/);
+});
+
+test('reports retain the visited destination note for grouped untouched links with one destination', () => {
+  const c = aggregateCoverage(['Asha', 'Ben', 'Chen'].map((name) => ({
+    testId: name, title: name, file: 'f', line: 1, views: ['/', '/profile'],
+    inventory: { '/': [el('link', name, '/profile')] }, interactions: {},
+  })));
+  assert.match(renderMarkdown(c), /link per test \(3 seen\) †/);
+  assert.match(renderReport({ project: 'p', coverage: c }), /Destination visited by URL, link never clicked/);
+  assert.equal(c.views[0]!.elements[0]!.href, '/profile');
+});

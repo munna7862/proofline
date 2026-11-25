@@ -15,7 +15,7 @@ export interface ElementInfo {
   disabled?: boolean;
   /** Inside a list item: the list's path plus the element's path within its item. Same value = siblings. */
   list?: string;
-  /** Repeated list items collapsed into this one element: how many distinct items were seen. */
+  /** How many distinct list items or per-test names collapsed into this element. */
   seen?: number;
 }
 

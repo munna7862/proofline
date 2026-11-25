@@ -54,7 +54,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   Prompt:
   > Read AGENTS.md and the header comment of src/page/agent.ts. Add focus-guard markers (Radix data-radix-focus-guard, Headless UI focus guard, generic data-focus-guard; read each in the package source and cite it) to the agent's ignore selector. Add a focus-guard span to the demo help page; ground truth already pins its elements. Run npm run calibrate (before/after line) and npm run verify.
 
-- [ ] **S4-T1 Elements named by per-run data count once (2.5 h, approved: inventory rule)**
+- [x] **S4-T1 Elements named by per-run data count once (2.5 h, approved: inventory rule)**
   S4-1: every row that differs between two passing epic-stack runs is a name built from faker data. Examples: "<name>'s Notes", "Change email from <email>", "<name> profile", note titles.
   Accept:
   - A pure function in `src/coverage/aggregate.ts` (sorted, deterministic) groups elements in one view with the same path, tag and role.

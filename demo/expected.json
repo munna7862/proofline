@@ -1,16 +1,17 @@
 {
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
-    "counts": {"tests": 11, "neverEnabled": 1},
+    "counts": {"tests": 14, "neverEnabled": 1},
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
   "testsExcluded": 1,
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/help", "/help/faq", "/community"],
+  "views": ["/", "/users/:param", "/users/links", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/help", "/help/faq", "/community"],
   "elements": {
     "/": ["button|Add to cart|", "button|Subscribe|", "link|About us|", "link|Cart (#)|cart-link", "link|Returns policy|", "textbox|Email|", "textbox|Search|"],
     "/users/:param": ["button|Follow|", "link|Back to shop|"],
+    "/users/links": ["link|per test|nav#user-links > a", "link|Back to shop|"],
     "/notes/:id": ["link|Back to shop|"],
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
     "/settings/drafts#/editor": ["generic|note|", "generic|Plain note|", "generic|rich-note|", "button|Accept|", "button|Reject|", "button|Lock draft|", "button|Preview|", "link||", "link|Draft view|"],
@@ -21,6 +22,7 @@
   "testedIn": {
     "/": ["button|Add to cart|", "textbox|Search|"],
     "/users/:param": ["button|Follow|"],
+    "/users/links": ["link|per test|nav#user-links > a"],
     "/notes/:id": [],
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
     "/settings/drafts#/editor": ["generic|note|", "generic|Plain note|", "button|Reject|", "button|Lock draft|", "button|Preview|"],
@@ -30,7 +32,7 @@
   },
   "privateMarkers": ["ProoflineEditorMarker", "ProoflinePlainEditorMarker", "ProoflineRouteMarker", "ProoflineLinkMarker", "ProoflineDraftLinkPathMarker", "ProoflineDraftLinkTextMarker"],
   "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},
-  "seen": {"/community": {"link|in list|ul#posts > li > a": 5}},
+  "seen": {"/community": {"link|in list|ul#posts > li > a": 5}, "/users/links": {"link|per test|nav#user-links > a": 3}},
   "neverEnabled": ["button|Processing...|"],
   "proof": {
     "GET /api/products": {"http-500": "killed", "network-fail": "killed", "empty-json": "killed", "shift-numbers": "killed", "blank-strings": "killed"},

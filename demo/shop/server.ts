@@ -259,6 +259,12 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
+    if (url.pathname === '/users/links') {
+      const username = escapeHtml(url.searchParams.get('user') ?? 'guest');
+      return res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>User links</title></head><body>
+<nav id="user-links"><a href="/about" onclick="event.preventDefault()">${username}'s notes</a><a href="/">Back to shop</a></nav>
+</body></html>`);
+    }
     if (url.pathname === '/help/tips') return res.end(TIPS_PAGE);
     if (url.pathname === '/outage') return res.end(OUTAGE_PAGE);
     const user = /^\/users\/([a-z_]+)$/.exec(url.pathname);

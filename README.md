@@ -62,6 +62,8 @@ import { test as mine } from './fixtures';
 export const test = mergeTests(mine, proofline);
 ```
 
+Coverage reports group three or more different labels at the same control location in a view as “per test (N seen)” when each label appears in exactly one test. Labels seen by multiple tests keep their own entries.
+
 ## Develop
 
 ```bash

@@ -129,6 +129,58 @@ export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
   return rest.sort((a, b) => a.key.localeCompare(b.key));
 }
 
+const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path].join('\0');
+const PER_TEST_MIN_NAMES = 3;
+
+interface NameObservations {
+  locationsByKey: Map<string, Set<string>>;
+  testsByLocation: Map<string, Map<string, Set<string>>>;
+}
+
+/** Collapse per-test names at the same location, preserving names shared by multiple tests. */
+function groupPerTestNames(
+  elements: ElementCoverage[],
+  observed: NameObservations,
+): ElementCoverage[] {
+  const groups = new Map<string, ElementCoverage[]>();
+  const rest: ElementCoverage[] = [];
+  for (const el of elements) {
+    if (el.seen || !el.name || !el.path || observed.locationsByKey.get(el.key)?.size !== 1) {
+      rest.push(el);
+      continue;
+    }
+    const location = elementLocation(el);
+    const group = groups.get(location) ?? [];
+    group.push(el);
+    groups.set(location, group);
+  }
+  for (const [location, members] of groups) {
+    const testsByName = observed.testsByLocation.get(location)!;
+    const singleTest = (el: ElementCoverage) => testsByName.get(el.name)?.size === 1;
+    const variants = members.filter(singleTest);
+    const singleTestNames = new Set(variants.map((el) => el.name)).size;
+    if (singleTestNames < PER_TEST_MIN_NAMES) {
+      rest.push(...members);
+      continue;
+    }
+    const { role, tag, path, href } = variants[0]!;
+    const sharedHref = href && variants.every((el) => el.href === href);
+    rest.push(...members.filter((el) => !singleTest(el)), {
+      key: `${role}|per test|${path}`,
+      role,
+      tag,
+      path,
+      name: `per test (${singleTestNames} seen)`,
+      seen: singleTestNames,
+      ...(sharedHref ? { href } : {}),
+      ...(sharedHref && variants.every((el) => el.reachedByUrl) ? { reachedByUrl: true } : {}),
+      tested: variants.some((el) => el.tested),
+      testedBy: [...new Set(variants.flatMap((el) => el.testedBy))].sort(),
+    });
+  }
+  return rest;
+}
+
 export interface AggregateOptions {
   /** Views to drop entirely, e.g. ['/admin/debug'] */
   ignoreViews?: string[];
@@ -147,6 +199,7 @@ export interface AggregateOptions {
  *    Seen enabled once, or interacted with, it is scored like any other element.
  *  - Per-test path segments are merged into one view first (see learnViewParams).
  *  - 3+ sibling items of one list count as one element, "N seen" (see groupListItems).
+ *  - Names unique to individual tests can count as one element at a shared location.
  */
 /** A record with no status (written by an older Proofline) still counts. */
 export const countsTowardCoverage = (rec: TestCoverageRecord) => rec.status === undefined || rec.status === 'passed';
@@ -162,6 +215,7 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
 
   const visitedViews = new Map<string, Set<string>>();
   const elements = new Map<string, Map<string, ElementCoverage>>();
+  const observedByView = new Map<string, NameObservations>();
 
   for (const rec of records) {
     for (const view of rec.views) {
@@ -173,12 +227,23 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
     for (const [view, els] of Object.entries(rec.inventory)) {
       if (ignoreViews.has(view)) continue;
       const map = elements.get(view) ?? new Map<string, ElementCoverage>();
+      const observed = observedByView.get(view) ?? { locationsByKey: new Map(), testsByLocation: new Map() };
       for (const el of els) {
         if (ignored(el.key)) continue;
+        const location = elementLocation(el);
+        const locations = observed.locationsByKey.get(el.key) ?? new Set<string>();
+        locations.add(location);
+        observed.locationsByKey.set(el.key, locations);
+        const testsByName = observed.testsByLocation.get(location) ?? new Map<string, Set<string>>();
+        const tests = testsByName.get(el.name) ?? new Set<string>();
+        tests.add(rec.testId);
+        testsByName.set(el.name, tests);
+        observed.testsByLocation.set(location, testsByName);
         const prev = map.get(el.key);
         if (!prev || (prev.disabled && !el.disabled)) map.set(el.key, { ...el, tested: false, testedBy: [] });
       }
       elements.set(view, map);
+      observedByView.set(view, observed);
     }
   }
 
@@ -214,7 +279,7 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
   const views: ViewCoverage[] = [...elements.entries()]
     .map(([view, map]) => {
       const all = [...map.values()];
-      const els = groupListItems(all.filter((e) => !e.disabled))
+      const els = groupPerTestNames(groupListItems(all.filter((e) => !e.disabled)), observedByView.get(view)!)
         .sort((a, b) => Number(a.tested) - Number(b.tested) || a.key.localeCompare(b.key));
       const neverEnabled: ElementInfo[] = all
         .filter((e) => e.disabled)
