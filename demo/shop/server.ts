@@ -322,9 +322,38 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {
       const username = escapeHtml(url.searchParams.get('user') ?? 'guest');
+      const shopNav = username === 'asha_rao' ? `
+<nav id="shop-links"><a href="/about">Catalog archive</a></nav>
+<nav id="moving-links"><a href="/about">Store hours</a></nav>
+<nav id="archived-links"></nav>
+<nav><a id="duplicate-shop-link" href="/about">About the shop</a><a id="duplicate-shop-link" href="/returns">Return terms</a><a id="duplicate-shop-link" href="/cart">Cart guide</a></nav>
+<script>
+const shopLinks = document.getElementById('shop-links');
+const movingLinks = document.getElementById('moving-links');
+const archivedLinks = document.getElementById('archived-links');
+function linkTo(href, name) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.textContent = name;
+  return link;
+}
+function rotateLink(href, name) {
+  archivedLinks.append(movingLinks.firstElementChild);
+  movingLinks.append(linkTo(href, name));
+}
+setTimeout(() => {
+  shopLinks.prepend(linkTo('/returns', 'Store policies'));
+  rotateLink('/returns', 'Return help');
+}, 320);
+setTimeout(() => {
+  shopLinks.prepend(linkTo('/cart', 'Cart help'));
+  rotateLink('/cart', 'Cart details');
+}, 640);
+</script>` : '';
       return res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>User links</title></head><body>
+${username === 'ben_okafor' ? '<div hidden></div>' : ''}
 <nav id="user-links"><a href="/about" onclick="event.preventDefault()">${username}'s notes</a><a href="/">Back to shop</a></nav>
-${username === 'asha_rao' ? '<nav id="shop-links"><a href="/about">Catalog archive</a><a href="/returns">Store policies</a><a href="/cart">Cart help</a></nav>' : ''}
+${shopNav}
 </body></html>`);
     }
     if (url.pathname === '/tips') return res.end(TIPS_PAGE);

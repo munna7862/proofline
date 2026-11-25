@@ -320,6 +320,24 @@ test('different slots at the same reported path each get an independent per-test
   ]);
 });
 
+test('moving controls stay separate from stable labels in a slot', () => {
+  const moving = { ...el('link', 'Catalog'), position: null };
+  const stable = ['Policy', 'Help'].map((name) => ({ ...el('link', name), position: 'a:0' }));
+  const { elements } = aggregateCoverage([visit('a', '/', [moving, ...stable])]).views[0]!;
+  assert.equal(elements.length, 3);
+  assert.ok(elements.every((el) => !el.seen));
+});
+
+test('a mix of older and positioned observations does not guess old records\' DOM positions', () => {
+  const records = [
+    visit('a', '/', ['A', 'B', 'C'].map((name) => el('link', name))),
+    visit('b', '/', [{ ...el('link', 'A'), position: 'a:0' }]),
+  ];
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.equal(elements.length, 3);
+  assert.ok(elements.every((el) => !el.seen));
+});
+
 test('a label also seen on a disabled element stays separate', () => {
   const records = ['Asha', 'Ben', 'Chen'].map((name) => visit(name, '/', [el('link', name)]));
   records.push(visit('busy', '/', [{ ...off('link', 'Asha'), key: 'link|Asha|other' }]));

@@ -53,6 +53,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 S4-T5 review follow-up. Hidden and ignored descendants leave wrapper credit intact. Renames preserve each field's interaction history and keep synthetic form and textbox values out of coverage, including during type changes and when another control references the textbox. Verify passed with 72 of 72 unit tests and calibration reporting `UI coverage 53.3% (24/45) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 - 2026-11-25 Coverage grouping now distinguishes separate DOM positions that share a display path. The demo has three new untouched navigation links and keeps grouping the three labels of the per-user link. Verify passed with 74 of 74 unit tests and calibration reporting `UI coverage 50% (24/48) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+- 2026-11-25 Coverage grouping review follow-up. Unique ID anchors preserve stable groups, and controls with changing locations or duplicate IDs keep separate rows. The demo adds six untouched links for the review cases. Verify passed with 78 of 78 unit tests and calibration reporting `UI coverage 44.4% (24/54) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

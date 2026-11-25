@@ -11,8 +11,8 @@ export interface ElementInfo {
   href?: string;
   /** Short CSS path, for humans to locate the element */
   path: string;
-  /** Element-child positions from the document root, for disambiguating equal CSS paths. */
-  position?: string;
+  /** Structural position within the display path. Null means multiple positions were observed. */
+  position?: string | null;
   /** Seen only while `disabled` or inside `aria-busy="true"` (a busy label such as "Processing..."). */
   disabled?: boolean;
   /** Inside a list item: the list's path plus the element's path within its item. Same value = siblings. */

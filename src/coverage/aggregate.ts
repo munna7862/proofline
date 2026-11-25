@@ -161,12 +161,14 @@ export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
   return rest.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path, el.position ?? ''].join('\0');
+const displayLocation = (el: ElementInfo) => [el.role, el.tag, el.path].join('\0');
+const elementLocation = (el: ElementInfo) => `${displayLocation(el)}\0${el.position === null ? 'unknown' : el.position ?? ''}`;
 const PER_TEST_MIN_NAMES = 3;
 
 interface NameObservations {
   locationsByKey: Map<string, Set<string>>;
   testsByLocation: Map<string, Map<string, Set<string>>>;
+  pathsWithPositions: Set<string>;
 }
 
 /** Collapse per-test names at the same location, preserving names shared by multiple tests. */
@@ -176,8 +178,12 @@ function groupPerTestNames(
 ): ElementCoverage[] {
   const groups = new Map<string, ElementCoverage[]>();
   const rest: ElementCoverage[] = [];
+  const grouped: ElementCoverage[] = [];
+  const groupCounts = new Map<string, number>();
   for (const el of elements) {
-    if (el.seen || !el.name || !el.path || observed.locationsByKey.get(el.key)?.size !== 1) {
+    if (el.seen || !el.name || !el.path || el.position === null ||
+        (el.position === undefined && observed.pathsWithPositions.has(displayLocation(el))) ||
+        observed.locationsByKey.get(el.key)?.size !== 1) {
       rest.push(el);
       continue;
     }
@@ -197,8 +203,11 @@ function groupPerTestNames(
     }
     const { role, tag, path, position, href } = variants[0]!;
     const sharedHref = href && variants.every((el) => el.href === href);
-    rest.push(...members.filter((el) => !singleTest(el)), {
-      key: `${role}|per test|${path}${position ? `|${position}` : ''}`,
+    const key = `${role}|per test|${path}`;
+    groupCounts.set(key, (groupCounts.get(key) ?? 0) + 1);
+    rest.push(...members.filter((el) => !singleTest(el)));
+    grouped.push({
+      key,
       role,
       tag,
       path,
@@ -211,7 +220,9 @@ function groupPerTestNames(
       testedBy: [...new Set(variants.flatMap((el) => el.testedBy))].sort(),
     });
   }
-  return rest;
+  return [...rest, ...grouped.map((el) => (groupCounts.get(el.key) ?? 0) > 1 && el.position
+    ? { ...el, key: `${el.key}|${el.position}` }
+    : el)];
 }
 
 export interface AggregateOptions {
@@ -259,9 +270,12 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
     for (const [view, els] of Object.entries(rec.inventory)) {
       if (ignoreViews.has(view)) continue;
       const map = elements.get(view) ?? new Map<string, ElementCoverage>();
-      const observed = observedByView.get(view) ?? { locationsByKey: new Map(), testsByLocation: new Map() };
+      const observed = observedByView.get(view) ?? {
+        locationsByKey: new Map(), testsByLocation: new Map(), pathsWithPositions: new Set<string>(),
+      };
       for (const el of els) {
         if (ignored(el.key)) continue;
+        if (el.position !== undefined) observed.pathsWithPositions.add(displayLocation(el));
         const location = elementLocation(el);
         const locations = observed.locationsByKey.get(el.key) ?? new Set<string>();
         locations.add(location);
