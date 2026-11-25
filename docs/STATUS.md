@@ -41,6 +41,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-24 Demo ground-truth review follow-up. Coverage totals and scores are derived from the expected controls for each view. Verify passed with 53 of 53 unit tests and calibration reporting `UI coverage 55.6% (15/27) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`. The Playwright demo reports passed the updated checker.
 
 - 2026-11-25 S4-T1 done. Three per-test link labels in the demo collapse into one tested control, and the shared link adds one untested control. Verify passed with 57 of 57 unit tests and calibration reporting `UI coverage 55.2% (16/29) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+- 2026-11-25 S4-T1 review follow-up. The threshold counts qualifying labels, shared labels stay separate even when also seen disabled, and grouped untouched links retain their common visited destination. Verify passed with 60 of 60 unit tests and calibration reporting `UI coverage 55.2% (16/29) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

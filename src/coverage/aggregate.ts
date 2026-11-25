@@ -130,22 +130,22 @@ export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
 }
 
 const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path].join('\0');
+const PER_TEST_MIN_NAMES = 3;
 
-interface ElementObservation {
-  locations: Set<string>;
-  tests: Set<string>;
+interface NameObservations {
+  locationsByKey: Map<string, Set<string>>;
+  testsByLocation: Map<string, Map<string, Set<string>>>;
 }
 
 /** Collapse per-test names at the same location, preserving names shared by multiple tests. */
 function groupPerTestNames(
   elements: ElementCoverage[],
-  observed: ReadonlyMap<string, ElementObservation>,
+  observed: NameObservations,
 ): ElementCoverage[] {
   const groups = new Map<string, ElementCoverage[]>();
   const rest: ElementCoverage[] = [];
   for (const el of elements) {
-    const observation = observed.get(el.key);
-    if (el.seen || !el.name || !el.path || observation?.locations.size !== 1) {
+    if (el.seen || !el.name || !el.path || observed.locationsByKey.get(el.key)?.size !== 1) {
       rest.push(el);
       continue;
     }
@@ -154,28 +154,26 @@ function groupPerTestNames(
     group.push(el);
     groups.set(location, group);
   }
-  for (const members of groups.values()) {
-    const testsByName = new Map<string, Set<string>>();
-    for (const el of members) {
-      const tests = testsByName.get(el.name) ?? new Set<string>();
-      for (const test of observed.get(el.key)!.tests) tests.add(test);
-      testsByName.set(el.name, tests);
-    }
-    const singleTestNames = [...testsByName].filter(([, tests]) => tests.size === 1);
-    const distinctTests = new Set(singleTestNames.flatMap(([, tests]) => [...tests]));
-    if (distinctTests.size < 3) {
+  for (const [location, members] of groups) {
+    const testsByName = observed.testsByLocation.get(location)!;
+    const singleTest = (el: ElementCoverage) => testsByName.get(el.name)?.size === 1;
+    const variants = members.filter(singleTest);
+    const singleTestNames = new Set(variants.map((el) => el.name)).size;
+    if (singleTestNames < PER_TEST_MIN_NAMES) {
       rest.push(...members);
       continue;
     }
-    const variants = members.filter((el) => testsByName.get(el.name)!.size === 1);
-    const { role, tag, path } = variants[0]!;
-    rest.push(...members.filter((el) => testsByName.get(el.name)!.size > 1), {
+    const { role, tag, path, href } = variants[0]!;
+    const sharedHref = href && variants.every((el) => el.href === href);
+    rest.push(...members.filter((el) => !singleTest(el)), {
       key: `${role}|per test|${path}`,
       role,
       tag,
       path,
-      name: `per test (${singleTestNames.length} seen)`,
-      seen: singleTestNames.length,
+      name: `per test (${singleTestNames} seen)`,
+      seen: singleTestNames,
+      ...(sharedHref ? { href } : {}),
+      ...(sharedHref && variants.every((el) => el.reachedByUrl) ? { reachedByUrl: true } : {}),
       tested: variants.some((el) => el.tested),
       testedBy: [...new Set(variants.flatMap((el) => el.testedBy))].sort(),
     });
@@ -217,7 +215,7 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
 
   const visitedViews = new Map<string, Set<string>>();
   const elements = new Map<string, Map<string, ElementCoverage>>();
-  const observedByView = new Map<string, Map<string, ElementObservation>>();
+  const observedByView = new Map<string, NameObservations>();
 
   for (const rec of records) {
     for (const view of rec.views) {
@@ -229,13 +227,18 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
     for (const [view, els] of Object.entries(rec.inventory)) {
       if (ignoreViews.has(view)) continue;
       const map = elements.get(view) ?? new Map<string, ElementCoverage>();
-      const observed = observedByView.get(view) ?? new Map<string, ElementObservation>();
+      const observed = observedByView.get(view) ?? { locationsByKey: new Map(), testsByLocation: new Map() };
       for (const el of els) {
         if (ignored(el.key)) continue;
-        const observation = observed.get(el.key) ?? { locations: new Set<string>(), tests: new Set<string>() };
-        observation.locations.add(elementLocation(el));
-        observation.tests.add(rec.testId);
-        observed.set(el.key, observation);
+        const location = elementLocation(el);
+        const locations = observed.locationsByKey.get(el.key) ?? new Set<string>();
+        locations.add(location);
+        observed.locationsByKey.set(el.key, locations);
+        const testsByName = observed.testsByLocation.get(location) ?? new Map<string, Set<string>>();
+        const tests = testsByName.get(el.name) ?? new Set<string>();
+        tests.add(rec.testId);
+        testsByName.set(el.name, tests);
+        observed.testsByLocation.set(location, testsByName);
         const prev = map.get(el.key);
         if (!prev || (prev.disabled && !el.disabled)) map.set(el.key, { ...el, tested: false, testedBy: [] });
       }

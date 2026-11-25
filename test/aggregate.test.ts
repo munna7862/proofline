@@ -155,7 +155,7 @@ test('per-test names group in one view and keep a shared name at the same path',
   assert.deepEqual(aggregateCoverage([...records].reverse()).views[0]!.elements, elements);
 });
 
-test('per-test grouping requires three names from three tests at the same path, tag and role', () => {
+test('per-test grouping requires three single-test names at the same path, tag and role', () => {
   const a = el('link', 'Asha');
   const b = el('link', 'Ben');
   const c = el('link', 'Chen');
@@ -166,11 +166,27 @@ test('per-test grouping requires three names from three tests at the same path, 
     [...two, visit('c', '/', [{ ...c, tag: 'a' }])],
     [...two, visit('c', '/', [el('button', 'Chen')])],
     [...two, visit('c', '/', [c, a])],
-    [visit('a', '/', [a, b, c])],
     [visit('a', '/', [a]), visit('b', '/', [b]), visit('c', '/', [c, { ...a, key: 'link|Asha|other' }])],
   ]) {
     assert.ok(aggregateCoverage(records).views[0]!.elements.every((e) => e.seen === undefined));
   }
+});
+
+test('per-test grouping counts distinct names even if a test sees more than one', () => {
+  const records = [
+    visit('a', '/', [el('link', 'Asha'), el('link', 'Ben')]),
+    visit('b', '/', [el('link', 'Chen')]),
+  ];
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.deepEqual(elements.map((e) => [e.key, e.seen]), [['link|per test|x', 3]]);
+});
+
+test('a label also seen on a disabled element stays separate', () => {
+  const records = ['Asha', 'Ben', 'Chen'].map((name) => visit(name, '/', [el('link', name)]));
+  records.push(visit('busy', '/', [{ ...off('link', 'Asha'), key: 'link|Asha|other' }]));
+  const coverage = aggregateCoverage(records);
+  assert.deepEqual(coverage.views[0]!.elements.map((e) => e.key), ['link|Asha|', 'link|Ben|', 'link|Chen|']);
+  assert.equal(coverage.neverEnabled, 1);
 });
 
 test('per-test grouping leaves existing list groups in place', () => {
