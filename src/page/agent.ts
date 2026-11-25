@@ -404,9 +404,13 @@ export function proofAgent(opts: AgentOptions): void {
   const fields = new WeakMap<Element, { id: string; views: Map<string, FieldState> }>();
   let nextField = 0;
 
-  const observe = (el: Element, view: string, positionOf: (el: Element) => string) => {
-    const currentPosition = positionOf(el);
-    const element: ReturnType<typeof describe> & { position: string | null } = { ...describe(el), position: currentPosition };
+  type ObservedElement = ReturnType<typeof describe> & { position: string | null };
+  const measure = (el: Element, positionOf: (el: Element) => string): ObservedElement =>
+    ({ ...describe(el), position: positionOf(el) });
+
+  const observe = (el: Element, view: string, measured: ObservedElement) => {
+    const element = { ...measured };
+    const currentPosition = element.position;
     const location = [element.path, element.role, element.tag, currentPosition].join('\0');
     const enabled = !element.disabled;
     const update = (previous: Seen | undefined) => {
@@ -444,14 +448,42 @@ export function proofAgent(opts: AgentOptions): void {
   // changed are recorded under the new view only once they are still there HOLD_MS later (the
   // end-of-test flush waits for that too). Shared layout (nav, header) survives; leftovers do not.
   const HOLD_MS = 600;
+  const SHELL_SELECTOR = 'header,nav,[role=banner],[role=navigation]';
+  type Departure = {
+    view: string;
+    controls: { node: Element; landmark: Element; element: ObservedElement }[];
+  };
   let currentView = '';
   let carried: WeakSet<Element> = new WeakSet();
   let changedAt = 0;
+  let awaitingSettleScan = false;
+  let pendingDeparture: Departure | undefined;
 
-  const onUrlChange = () => {
+  const visibleShell = (node: Element) => {
+    if (!node.isConnected || isIgnored(node) || node.closest('[hidden],[aria-hidden="true"]')) return null;
+    const landmark = node.closest(SHELL_SELECTOR);
+    if (!landmark) return null;
+    const visibility = getComputedStyle(node).visibility;
+    return visibility !== 'hidden' && visibility !== 'collapse' && isVisible(node) ? landmark : null;
+  };
+
+  const captureDeparture = (): Departure | undefined => {
+    if (!awaitingSettleScan) return;
+    const controls: Departure['controls'] = [];
+    const positionOf = positionsInSnapshot();
+    for (const node of document.querySelectorAll(opts.interactiveSelector)) {
+      if (!carried.has(node)) continue;
+      const landmark = visibleShell(node);
+      if (landmark) controls.push({ node, landmark, element: measure(node, positionOf) });
+    }
+    if (controls.length) return { view: currentView, controls };
+  };
+
+  const onUrlChange = (departure?: Departure) => {
     const view = viewOf(location.href);
     emit({ type: 'view', view });
     if (view !== currentView) {
+      pendingDeparture = departure;
       currentView = view;
       carried = new WeakSet();
       try {
@@ -460,6 +492,7 @@ export function proofAgent(opts: AgentOptions): void {
         /* never break the app */
       }
       changedAt = Date.now();
+      awaitingSettleScan = true;
       setTimeout(scheduleScan, HOLD_MS);
     }
     scheduleScan();
@@ -471,12 +504,24 @@ export function proofAgent(opts: AgentOptions): void {
     const view = viewOf(location.href);
     const positionOf = positionsInSnapshot();
     const fresh: any[] = [];
-    const holding = !final && Date.now() - changedAt < HOLD_MS;
+    const settled = Date.now() - changedAt >= HOLD_MS;
+    if (settled) awaitingSettleScan = false;
+    if (settled && pendingDeparture) {
+      const { view: departed, controls } = pendingDeparture;
+      pendingDeparture = undefined;
+      const restored = controls.flatMap(({ node, landmark, element }) => {
+        if (!node.matches(opts.interactiveSelector) || visibleShell(node) !== landmark) return [];
+        const entry = observe(node, departed, element);
+        return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
+      });
+      if (restored.length) emit({ type: 'inventory', view: departed, elements: restored });
+    }
+    const holding = !final && !settled;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
       if (isIgnored(el)) return;
       if (!isVisible(el)) return;
-      const entry = observe(el, view, positionOf);
+      const entry = observe(el, view, measure(el, positionOf));
       if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId });
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
@@ -501,7 +546,7 @@ export function proofAgent(opts: AgentOptions): void {
     // record it now, before the test can navigate away ahead of the next scan, so every
     // interaction has an inventory entry.
     carried.delete(el);
-    const { element, nodeId, fresh } = observe(el, view, positionOf);
+    const { element, nodeId, fresh } = observe(el, view, measure(el, positionOf));
     if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId }] });
     emit({ type: 'interaction', view, key: element.key, nodeId, event });
   };
@@ -583,14 +628,20 @@ export function proofAgent(opts: AgentOptions): void {
   const wrapHistory = (method: 'pushState' | 'replaceState') => {
     const original = history[method];
     history[method] = function (this: History, ...args: any[]) {
+      let departure: Departure | undefined;
+      try {
+        departure = captureDeparture();
+      } catch {
+        /* never break navigation */
+      }
       const result = (original as any).apply(this, args);
-      onUrlChange();
+      onUrlChange(departure);
       return result;
     } as any;
   };
   wrapHistory('pushState');
   wrapHistory('replaceState');
-  window.addEventListener('popstate', onUrlChange);
+  window.addEventListener('popstate', () => onUrlChange());
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();

@@ -164,6 +164,23 @@ render();
 </script>
 </body></html>`;
 
+const FLOW_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Fast flow</title></head><body>
+<header><nav><a href="/">Back to shop</a><button id="retired">Old navigation</button></nav></header>
+<main><button id="start">Start flow</button></main>
+<script>
+const main = document.querySelector('main');
+document.getElementById('start').addEventListener('click', () => {
+  history.pushState(null, '', '/flow/intermediate');
+  main.innerHTML = '<button id="continue">Continue flow</button>';
+  document.getElementById('continue').addEventListener('click', () => {
+    history.pushState(null, '', '/flow/done');
+    document.getElementById('retired').remove();
+    main.textContent = 'Flow complete';
+  });
+});
+</script>
+</body></html>`;
+
 const CHECKOUT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Checkout</title></head><body>
 <h1>Checkout</h1>
 <a href="/cart" id="checkout-link" aria-label="Checkout link"><button type="button" id="checkout">Proceed to checkout</button><span data-focus-guard tabindex="0"></span><button hidden>Hidden option</button></a>
@@ -318,6 +335,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
     if (url.pathname === '/settings/menu') return res.end(MENU_PAGE);
     if (url.pathname === '/checkout/form') return res.end(CHECKOUT_PAGE);
+    if (url.pathname === '/flow/start') return res.end(FLOW_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {

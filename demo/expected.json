@@ -1,13 +1,13 @@
 {
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
-    "counts": {"tests": 16, "neverEnabled": 2},
+    "counts": {"tests": 17, "neverEnabled": 2},
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
   "testsExcluded": 1,
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/users/:param/notes", "/users/:param/notes/new", "/users/links", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/settings/menu", "/checkout/form", "/help", "/help/faq", "/community", "/tips"],
+  "views": ["/", "/users/:param", "/users/:param/notes", "/users/:param/notes/new", "/users/links", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/settings/menu", "/checkout/form", "/flow/start", "/flow/intermediate", "/flow/done", "/help", "/help/faq", "/community", "/tips"],
   "elements": {
     "/": ["button|Add to cart|", "button|Subscribe|", "link|About us|", "link|Cart (#)|cart-link", "link|Returns policy|", "textbox|Email|", "textbox|Search|"],
     "/users/:param": ["button|Follow|", "link|Back to shop|"],
@@ -20,6 +20,9 @@
     "/settings/menu": ["button|User menu|", "menuitem|Settings|", "button|Show details|", "button|Ordinary button|", "button|Synthetic trigger|"],
     "/checkout/form": ["link|Checkout link|", "button|Proceed to checkout|", "link|Options link|", "button|Edit|", "button|Cancel|", "textbox|Password|", "textbox|Order note|", "textbox|order-reference|"],
     "/help": ["button|Open FAQ|", "link|Help home|"],
+    "/flow/start": ["button|Start flow|", "button|Old navigation|", "link|Back to shop|"],
+    "/flow/intermediate": ["button|Continue flow|", "link|Back to shop|"],
+    "/flow/done": ["link|Back to shop|"],
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
     "/community": ["button|Join community|", "link|in list|ul#posts > li > a"],
     "/tips": ["link|Back to shop|"]
@@ -36,6 +39,9 @@
     "/settings/menu": ["button|User menu|", "menuitem|Settings|", "button|Show details|"],
     "/checkout/form": ["link|Checkout link|", "button|Proceed to checkout|", "button|Edit|", "textbox|Password|", "textbox|Order note|"],
     "/help": ["button|Open FAQ|"],
+    "/flow/start": ["button|Start flow|"],
+    "/flow/intermediate": ["button|Continue flow|"],
+    "/flow/done": [],
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
     "/community": ["button|Join community|", "link|in list|ul#posts > li > a"],
     "/tips": []
