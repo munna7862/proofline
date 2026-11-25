@@ -191,8 +191,7 @@ export interface AggregateOptions {
 /**
  * Semantics (documented in docs/ARCHITECTURE.md, keep in sync):
  *  - An element is "tested" if any test interacted with it on that view.
- *  - Links follow the same rule: only a click counts. A link whose destination view
- *    was visited some other way stays untested and carries reachedByUrl: true.
+ *  - Visiting a link's destination alone leaves the link untested and sets reachedByUrl: true.
  *  - score = tested / total over all non-ignored elements in all visited views.
  *  - An element no test ever saw enabled (only `disabled` or inside `aria-busy="true"`,
  *    e.g. a "Processing..." label) is not applicable: listed in neverEnabled, outside the score.

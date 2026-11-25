@@ -164,6 +164,39 @@ render();
 </script>
 </body></html>`;
 
+// The menu opens on pointerdown and makes the rest of the page pointer-inert
+// before pointerup, so a click never reaches the trigger.
+const MENU_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Menu</title></head><body>
+<h1>Menu settings</h1>
+<button id="user-menu" aria-haspopup="menu"><span>User menu</span></button>
+<div id="menu" role="menu" hidden style="pointer-events:auto"><button type="button" role="menuitem" id="settings-item">Settings</button></div>
+<button type="button" id="disclosure" aria-expanded="false">Show details</button>
+<p id="details" hidden>Menu details</p>
+<button type="button" id="ordinary">Ordinary button</button>
+<button type="button" id="synthetic" aria-haspopup="menu">Synthetic trigger</button>
+<button type="button" id="disabled-menu" aria-haspopup="menu" disabled><span>Disabled menu</span></button>
+<p id="selection"></p>
+<script>
+const trigger = document.getElementById('user-menu');
+const menu = document.getElementById('menu');
+trigger.addEventListener('pointerdown', () => {
+  menu.hidden = false;
+  document.body.style.pointerEvents = 'none';
+});
+trigger.addEventListener('click', () => { trigger.dataset.clicked = 'true'; });
+document.getElementById('settings-item').addEventListener('click', () => {
+  menu.hidden = true;
+  document.body.style.pointerEvents = '';
+  document.getElementById('selection').textContent = 'Settings selected';
+});
+const disclosure = document.getElementById('disclosure');
+disclosure.addEventListener('pointerdown', () => {
+  disclosure.setAttribute('aria-expanded', 'true');
+  document.getElementById('details').hidden = false;
+});
+</script>
+</body></html>`;
+
 // Community: 5 post links whose titles are generated at server start (new every run, like faker
 // data in seeded suites) and a toast after joining (Sonner markup, a greeting with a name and a
 // Dismiss button). The 5 links must count as one "in list (5 seen)" element; the toast is not an element.
@@ -257,6 +290,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/returns') return res.end(simplePage('Returns policy'));
     if (url.pathname === '/settings/avatar') return res.end(AVATAR_PAGE);
     if (url.pathname === '/settings/drafts') return res.end(DRAFTS_PAGE);
+    if (url.pathname === '/settings/menu') return res.end(MENU_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {

@@ -74,7 +74,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   Prompt:
   > Read AGENTS.md, the founder's decision for S4-T1 in docs/sprints/SPRINT_04.md, and groupListItems/learnViewParams in src/coverage/aggregate.ts. Add a pure function that merges, within one view, elements with the same path, tag and role whose names each come from a single test, when there are 3 or more, into one "<role> per test (N seen)" element, tested if any member was. Never merge names seen by 2+ tests. Show it in the HTML report and Markdown. Add a demo page with per-test names plus a shared fixed link, ground truth in demo/expected.json, unit tests including the negative cases. Run npm run calibrate (before/after line), npm run demo twice, npm run verify.
 
-- [ ] **S4-T2 Menu triggers that open on pointerdown count as tested (1.5 h, approved: definition of tested)**
+- [x] **S4-T2 Menu triggers that open on pointerdown count as tested (1.5 h, approved: definition of tested)**
   S4-2: Radix's "User menu" on epic-stack opens on `pointerdown`; the modal menu then blocks the `click`. Three tests click it, yet it shows untested on 10 views.
   Accept:
   - The agent records an interaction on a trusted `pointerdown` whose closest interactive element has `aria-haspopup` or `aria-expanded`. Every other element still needs click, input or change.

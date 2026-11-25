@@ -129,6 +129,28 @@ const tests: DemoTest[] = [
       await eventually(async () => new URL(page.url()).pathname === '/help', 'back on help home');
     },
   },
+  // demo/tests/menu.spec.ts: modal menu and disclosure triggers receive pointerdown without a click
+  {
+    testId: 'm1', title: 'opens the user menu on pointerdown and selects an item',
+    file: 'demo/tests/menu.spec.ts', line: 3, start: '/settings/menu',
+    body: async (page) => {
+      const trigger = page.getByRole('button', { name: 'User menu' });
+      await trigger.locator('span').click({ timeout: 2000 });
+      const item = page.getByRole('menuitem', { name: 'Settings' });
+      await item.waitFor({ timeout: 2000 });
+      if ((await trigger.getAttribute('data-clicked')) === 'true') throw new Error('menu trigger received click');
+      await item.click({ timeout: 2000 });
+      await eventually(async () => (await textOf(page, '#selection')) === 'Settings selected', 'settings selected');
+      for (const name of ['Show details', 'Ordinary button', 'Disabled menu']) {
+        await page.getByText(name, { exact: true }).hover({ timeout: 2000 });
+        await page.mouse.down();
+        await page.mouse.move(0, 0);
+        await page.mouse.up();
+      }
+      await page.locator('#details').waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Synthetic trigger' }).dispatchEvent('pointerdown', {}, { timeout: 2000 });
+    },
+  },
   // demo/tests/community.spec.ts: generated list items count once; toasts are not elements
   {
     testId: 'c1', title: 'joining greets and a post opens', file: 'demo/tests/community.spec.ts', line: 11, start: '/community',
