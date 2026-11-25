@@ -56,6 +56,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 Coverage grouping review follow-up. Unique ID anchors preserve stable groups, and controls with changing locations or duplicate IDs keep separate rows. The demo adds six untouched links for the review cases. Verify passed with 78 of 78 unit tests and calibration reporting `UI coverage 44.4% (24/54) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 - 2026-11-25 Fast intermediate views recover persistent navigation when the same visible control survives until the next view settles. The demo adds six controls, two tested, and checks that a departing navigation control stays outside the intermediate view. Verify passed with 78 of 78 unit tests and calibration reporting `UI coverage 43.3% (26/60) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+- 2026-11-25 Fast-view review follow-up. Snapshots keep transient field values private and exclude transparent controls. Recovery happens at the hold deadline, including during teardown. Review fixtures account for the move to 27 of 81 covered controls. Verify passed with 78 of 78 unit tests and calibration reporting `UI coverage 33.3% (27/81) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

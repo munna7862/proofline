@@ -196,13 +196,15 @@ export function proofAgent(opts: AgentOptions): void {
 
   // User-entered values are not labels. Contenteditable stores its value in DOM text.
   const valueFields = new WeakSet<Element>();
+  const isFieldInputType = (type: string) =>
+    type !== 'submit' && type !== 'button' && type !== 'reset' && type !== 'image';
   const isField = (el: Element) => {
     if (isDraftContent(el) || isTextbox(el)) return true;
     const tag = el.tagName;
     if (tag === 'TEXTAREA' || tag === 'SELECT') valueFields.add(el);
     if (tag === 'INPUT') {
       const type = (el as HTMLInputElement).type;
-      if (type !== 'submit' && type !== 'button' && type !== 'reset' && type !== 'image') valueFields.add(el);
+      if (isFieldInputType(type)) valueFields.add(el);
     }
     return valueFields.has(el);
   };
@@ -458,17 +460,60 @@ export function proofAgent(opts: AgentOptions): void {
   let changedAt = 0;
   let awaitingSettleScan = false;
   let pendingDeparture: Departure | undefined;
+  let documentObserver: MutationObserver | undefined;
+  let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const onDomChanges = (changes: MutationRecord[]) => {
+    for (const change of changes) {
+      const target = change.target as Element;
+      const previous = change.oldValue?.toLowerCase();
+      // A control can briefly hold a value before a scan sees its new role or type.
+      if (change.attributeName === 'contenteditable') {
+        if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
+        isEditingHost(target);
+      } else if (change.attributeName === 'role' && previous === 'textbox') {
+        textboxes.add(target);
+      } else if (change.attributeName === 'type' && target.tagName === 'INPUT' && isFieldInputType(previous ?? 'text')) {
+        valueFields.add(target);
+      }
+    }
+    scheduleScan();
+  };
 
   const visibleShell = (node: Element) => {
     if (!node.isConnected || isIgnored(node) || node.closest('[hidden],[aria-hidden="true"]')) return null;
     const landmark = node.closest(SHELL_SELECTOR);
     if (!landmark) return null;
+    if (typeof node.checkVisibility === 'function') {
+      return node.checkVisibility({ opacityProperty: true, visibilityProperty: true }) ? landmark : null;
+    }
     const visibility = getComputedStyle(node).visibility;
-    return visibility !== 'hidden' && visibility !== 'collapse' && isVisible(node) ? landmark : null;
+    if (visibility === 'hidden' || visibility === 'collapse' || !isVisible(node)) return null;
+    for (let ancestor: Element | null = node; ancestor; ancestor = ancestor.parentElement) {
+      if (getComputedStyle(ancestor).opacity === '0') return null;
+    }
+    return landmark;
+  };
+
+  const confirmDeparture = (settled = Date.now() - changedAt >= HOLD_MS) => {
+    if (!pendingDeparture || !settled) return;
+    const { view: departed, controls } = pendingDeparture;
+    pendingDeparture = undefined;
+    const restored = controls.flatMap(({ node, landmark, element }) => {
+      if (!node.matches(opts.interactiveSelector) || visibleShell(node) !== landmark) return [];
+      const entry = observe(node, departed, element);
+      return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
+    });
+    if (restored.length) emit({ type: 'inventory', view: departed, elements: restored });
   };
 
   const captureDeparture = (): Departure | undefined => {
-    if (!awaitingSettleScan) return;
+    if (!awaitingSettleScan || !documentObserver) return;
+    // History calls can occur before the observer delivers edits from this same JS task.
+    const queuedChanges = documentObserver.takeRecords();
+    if (queuedChanges.length) onDomChanges(queuedChanges);
+    // The hold may have elapsed while a debounced scan is still waiting to run.
+    confirmDeparture();
     const controls: Departure['controls'] = [];
     const positionOf = positionsInSnapshot();
     for (const node of document.querySelectorAll(opts.interactiveSelector)) {
@@ -493,7 +538,15 @@ export function proofAgent(opts: AgentOptions): void {
       }
       changedAt = Date.now();
       awaitingSettleScan = true;
-      setTimeout(scheduleScan, HOLD_MS);
+      clearTimeout(settleTimer);
+      settleTimer = setTimeout(() => {
+        try {
+          confirmDeparture(true);
+        } catch {
+          /* never break the app */
+        }
+        scheduleScan();
+      }, HOLD_MS);
     }
     scheduleScan();
   };
@@ -506,16 +559,7 @@ export function proofAgent(opts: AgentOptions): void {
     const fresh: any[] = [];
     const settled = Date.now() - changedAt >= HOLD_MS;
     if (settled) awaitingSettleScan = false;
-    if (settled && pendingDeparture) {
-      const { view: departed, controls } = pendingDeparture;
-      pendingDeparture = undefined;
-      const restored = controls.flatMap(({ node, landmark, element }) => {
-        if (!node.matches(opts.interactiveSelector) || visibleShell(node) !== landmark) return [];
-        const entry = observe(node, departed, element);
-        return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
-      });
-      if (restored.length) emit({ type: 'inventory', view: departed, elements: restored });
-    }
+    confirmDeparture();
     const holding = !final && !settled;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
@@ -602,17 +646,8 @@ export function proofAgent(opts: AgentOptions): void {
     currentView = viewOf(location.href);
     emit({ type: 'view', view: currentView });
     scan();
-    new MutationObserver((changes) => {
-      for (const change of changes) {
-        if (change.attributeName !== 'contenteditable') continue;
-        const target = change.target as Element;
-        const previous = change.oldValue?.toLowerCase();
-        // A toggle can complete before the next scan. Keep treating its retained text as a draft.
-        if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
-        isEditingHost(target);
-      }
-      scheduleScan();
-    }).observe(document.documentElement, {
+    documentObserver = new MutationObserver(onDomChanges);
+    documentObserver.observe(document.documentElement, {
       subtree: true,
       childList: true,
       characterData: true,
