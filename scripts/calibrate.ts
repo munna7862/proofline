@@ -6,7 +6,7 @@
  *
  * Why this exists: the runner adapter is thin; the engine is where bugs hide.
  * This script is the engine's own test. It runs in CI on every commit.
- * The "tests" below mirror demo/tests/shop.spec.ts, profiles.spec.ts and avatar.spec.ts step for step.
+ * The "tests" below mirror the Playwright suite in demo/tests/.
  */
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
@@ -96,6 +96,17 @@ const tests: DemoTest[] = [
       if ((await page.title()) !== 'Note') throw new Error('note title');
     },
   },
+  // demo/tests/user-links.spec.ts: three per-test labels and a shared label at the same path
+  ...['asha_rao', 'ben_okafor', 'chen_li'].map((user): DemoTest => ({
+    testId: `links-${user}`, title: `shows links for ${user}`, file: 'demo/tests/user-links.spec.ts', line: 4,
+    start: `/users/links?user=${user}`,
+    body: async (page) => {
+      const notes = page.getByRole('link', { name: `${user}'s notes` });
+      await notes.waitFor({ timeout: 2000 });
+      await page.getByRole('link', { name: 'Back to shop' }).waitFor({ timeout: 2000 });
+      if (user === 'asha_rao') await notes.click({ timeout: 2000 });
+    },
+  })),
   // demo/tests/avatar.spec.ts: busy-state button and an unlabelled file input (no phantom elements)
   {
     testId: 'a1', title: 'avatar upload saves', file: 'demo/tests/avatar.spec.ts', line: 10, start: '/settings/avatar',

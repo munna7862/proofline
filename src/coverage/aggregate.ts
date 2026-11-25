@@ -129,6 +129,60 @@ export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
   return rest.sort((a, b) => a.key.localeCompare(b.key));
 }
 
+const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path].join('\0');
+
+interface ElementObservation {
+  locations: Set<string>;
+  tests: Set<string>;
+}
+
+/** Collapse per-test names at the same location, preserving names shared by multiple tests. */
+function groupPerTestNames(
+  elements: ElementCoverage[],
+  observed: ReadonlyMap<string, ElementObservation>,
+): ElementCoverage[] {
+  const groups = new Map<string, ElementCoverage[]>();
+  const rest: ElementCoverage[] = [];
+  for (const el of elements) {
+    const observation = observed.get(el.key);
+    if (el.seen || !el.name || !el.path || observation?.locations.size !== 1) {
+      rest.push(el);
+      continue;
+    }
+    const location = elementLocation(el);
+    const group = groups.get(location) ?? [];
+    group.push(el);
+    groups.set(location, group);
+  }
+  for (const members of groups.values()) {
+    const testsByName = new Map<string, Set<string>>();
+    for (const el of members) {
+      const tests = testsByName.get(el.name) ?? new Set<string>();
+      for (const test of observed.get(el.key)!.tests) tests.add(test);
+      testsByName.set(el.name, tests);
+    }
+    const singleTestNames = [...testsByName].filter(([, tests]) => tests.size === 1);
+    const distinctTests = new Set(singleTestNames.flatMap(([, tests]) => [...tests]));
+    if (distinctTests.size < 3) {
+      rest.push(...members);
+      continue;
+    }
+    const variants = members.filter((el) => testsByName.get(el.name)!.size === 1);
+    const { role, tag, path } = variants[0]!;
+    rest.push(...members.filter((el) => testsByName.get(el.name)!.size > 1), {
+      key: `${role}|per test|${path}`,
+      role,
+      tag,
+      path,
+      name: `per test (${singleTestNames.length} seen)`,
+      seen: singleTestNames.length,
+      tested: variants.some((el) => el.tested),
+      testedBy: [...new Set(variants.flatMap((el) => el.testedBy))].sort(),
+    });
+  }
+  return rest;
+}
+
 export interface AggregateOptions {
   /** Views to drop entirely, e.g. ['/admin/debug'] */
   ignoreViews?: string[];
@@ -147,6 +201,7 @@ export interface AggregateOptions {
  *    Seen enabled once, or interacted with, it is scored like any other element.
  *  - Per-test path segments are merged into one view first (see learnViewParams).
  *  - 3+ sibling items of one list count as one element, "N seen" (see groupListItems).
+ *  - Names unique to individual tests can count as one element at a shared location.
  */
 /** A record with no status (written by an older Proofline) still counts. */
 export const countsTowardCoverage = (rec: TestCoverageRecord) => rec.status === undefined || rec.status === 'passed';
@@ -162,6 +217,7 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
 
   const visitedViews = new Map<string, Set<string>>();
   const elements = new Map<string, Map<string, ElementCoverage>>();
+  const observedByView = new Map<string, Map<string, ElementObservation>>();
 
   for (const rec of records) {
     for (const view of rec.views) {
@@ -173,12 +229,18 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
     for (const [view, els] of Object.entries(rec.inventory)) {
       if (ignoreViews.has(view)) continue;
       const map = elements.get(view) ?? new Map<string, ElementCoverage>();
+      const observed = observedByView.get(view) ?? new Map<string, ElementObservation>();
       for (const el of els) {
         if (ignored(el.key)) continue;
+        const observation = observed.get(el.key) ?? { locations: new Set<string>(), tests: new Set<string>() };
+        observation.locations.add(elementLocation(el));
+        observation.tests.add(rec.testId);
+        observed.set(el.key, observation);
         const prev = map.get(el.key);
         if (!prev || (prev.disabled && !el.disabled)) map.set(el.key, { ...el, tested: false, testedBy: [] });
       }
       elements.set(view, map);
+      observedByView.set(view, observed);
     }
   }
 
@@ -214,7 +276,7 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
   const views: ViewCoverage[] = [...elements.entries()]
     .map(([view, map]) => {
       const all = [...map.values()];
-      const els = groupListItems(all.filter((e) => !e.disabled))
+      const els = groupPerTestNames(groupListItems(all.filter((e) => !e.disabled)), observedByView.get(view)!)
         .sort((a, b) => Number(a.tested) - Number(b.tested) || a.key.localeCompare(b.key));
       const neverEnabled: ElementInfo[] = all
         .filter((e) => e.disabled)

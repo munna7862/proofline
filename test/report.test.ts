@@ -52,3 +52,12 @@ test('reports show repeated list items as one element with how many were seen', 
   assert.match(renderMarkdown(c), /link in list \(3 seen\)/);
   assert.match(renderReport({ project: 'p', coverage: c }), /<span class="role">link<\/span> in list \(3 seen\)/);
 });
+
+test('reports show grouped per-test names with how many were seen', () => {
+  const c = aggregateCoverage(['Asha', 'Ben', 'Chen'].map((name) => ({
+    testId: name, title: name, file: 'f', line: 1, views: ['/'],
+    inventory: { '/': [el('link', name)] }, interactions: {},
+  })));
+  assert.match(renderMarkdown(c), /link per test \(3 seen\)/);
+  assert.match(renderReport({ project: 'p', coverage: c }), /<span class="role">link<\/span> per test \(3 seen\)/);
+});
