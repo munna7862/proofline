@@ -154,6 +154,21 @@ const tests: DemoTest[] = [
       await page.getByRole('button', { name: 'Start quick flow' }).click({ timeout: 2000 });
     },
   },
+  // demo/tests/embedded.spec.ts: routed and inline same-origin frames.
+  {
+    testId: 'embedded', title: 'uses same-origin embedded controls',
+    file: 'demo/tests/embedded.spec.ts', line: 3, start: '/embedded',
+    body: async (page) => {
+      const saved = page.frameLocator('[title="Saved panel"]');
+      await saved.getByRole('button', { name: 'Save panel' }).click({ timeout: 2000 });
+      await saved.getByText('Saved', { exact: true }).waitFor({ timeout: 2000 });
+      const note = page.frameLocator('[title="Note panel"]').getByRole('textbox', { name: 'Panel note' });
+      await note.fill('ProoflineFrameInputMarker', { timeout: 2000 });
+      if (await note.inputValue() !== 'ProoflineFrameInputMarker') throw new Error('note value');
+      await page.frameLocator('[title="Backup panel"]').getByRole('textbox', { name: 'Panel note' }).waitFor({ timeout: 2000 });
+      await page.frameLocator('[title="Other origin"]').getByRole('button').waitFor({ timeout: 2000 });
+    },
+  },
   // demo/tests/help.spec.ts: the old view lingers after a client-side route change (no route bleed)
   {
     testId: 'h1', title: 'faq feedback is thanked', file: 'demo/tests/help.spec.ts', line: 11, start: '/help',

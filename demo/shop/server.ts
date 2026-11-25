@@ -76,6 +76,17 @@ const simplePage = (title: string) =>
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+const EMBEDDED_CONTROLS = `<!doctype html><button onclick="document.querySelector('p').textContent = 'Saved'">Save panel</button>
+<button>Reset panel</button><p>Unsaved</p>`;
+const INLINE_CONTROLS = '<label>Panel note <input></label><button>Clear note</button>';
+const embeddedPage = (port: number) => `<!doctype html><title>Embedded panels</title>
+<button>Close panels</button>
+<iframe title="Saved panel" src="/embedded/controls"></iframe>
+<iframe title="Note panel" srcdoc="${escapeHtml(INLINE_CONTROLS)}"></iframe>
+<iframe title="Backup panel" srcdoc="${escapeHtml(INLINE_CONTROLS)}"></iframe>
+<iframe title="Hidden panel" hidden srcdoc="<button>Hidden action</button>"></iframe>
+<iframe title="Other origin" src="http://127.0.0.1:${port}/embedded/foreign"></iframe>`;
+
 // Per-user page: each test visits its own user, like suites that create a fresh user per test.
 const profilePage = (username: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Profile</title></head><body>
@@ -382,6 +393,9 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/flow/start') return res.end(FLOW_PAGE);
     if (url.pathname === '/flow/auto') return res.end(AUTO_FLOW_PAGE);
     if (url.pathname === '/bootstrap/start') return res.end(BOOTSTRAP_PAGE);
+    if (url.pathname === '/embedded') return res.end(embeddedPage(port));
+    if (url.pathname === '/embedded/controls') return res.end(EMBEDDED_CONTROLS);
+    if (url.pathname === '/embedded/foreign') return res.end('<!doctype html><button>ProoflineForeignFrameMarker</button>');
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {
