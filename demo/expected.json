@@ -7,10 +7,12 @@
   },
   "testsExcluded": 1,
   "reachedByUrl": ["link|Back to shop|"],
-  "views": ["/", "/users/:param", "/users/links", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/settings/menu", "/help", "/help/faq", "/community"],
+  "views": ["/", "/users/:param", "/users/:param/notes", "/users/:param/notes/new", "/users/links", "/notes/:id", "/settings/avatar", "/settings/drafts#/editor", "/settings/menu", "/help", "/help/faq", "/community", "/tips"],
   "elements": {
     "/": ["button|Add to cart|", "button|Subscribe|", "link|About us|", "link|Cart (#)|cart-link", "link|Returns policy|", "textbox|Email|", "textbox|Search|"],
     "/users/:param": ["button|Follow|", "link|Back to shop|"],
+    "/users/:param/notes": ["link|Back to shop|"],
+    "/users/:param/notes/new": ["link|Back to shop|"],
     "/users/links": ["link|per test|nav#user-links > a", "link|Back to shop|"],
     "/notes/:id": ["link|Back to shop|"],
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
@@ -18,11 +20,14 @@
     "/settings/menu": ["button|User menu|", "menuitem|Settings|", "button|Show details|", "button|Ordinary button|", "button|Synthetic trigger|"],
     "/help": ["button|Open FAQ|", "link|Help home|"],
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
-    "/community": ["button|Join community|", "link|in list|ul#posts > li > a"]
+    "/community": ["button|Join community|", "link|in list|ul#posts > li > a"],
+    "/tips": ["link|Back to shop|"]
   },
   "testedIn": {
     "/": ["button|Add to cart|", "textbox|Search|"],
     "/users/:param": ["button|Follow|"],
+    "/users/:param/notes": [],
+    "/users/:param/notes/new": [],
     "/users/links": ["link|per test|nav#user-links > a"],
     "/notes/:id": [],
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
@@ -30,7 +35,8 @@
     "/settings/menu": ["button|User menu|", "menuitem|Settings|", "button|Show details|"],
     "/help": ["button|Open FAQ|"],
     "/help/faq": ["button|Was this helpful?|", "link|Help home|"],
-    "/community": ["button|Join community|", "link|in list|ul#posts > li > a"]
+    "/community": ["button|Join community|", "link|in list|ul#posts > li > a"],
+    "/tips": []
   },
   "privateMarkers": ["ProoflineEditorMarker", "ProoflinePlainEditorMarker", "ProoflineRouteMarker", "ProoflineLinkMarker", "ProoflineDraftLinkPathMarker", "ProoflineDraftLinkTextMarker"],
   "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},

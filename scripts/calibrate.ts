@@ -76,22 +76,30 @@ const tests: DemoTest[] = [
   },
   // demo/tests/profiles.spec.ts: per-user pages and a cuid URL (view normalization)
   {
-    testId: 'p1', title: 'profile shows the username', file: 'demo/tests/profiles.spec.ts', line: 9, start: '/users/asha_rao',
+    testId: 'p1', title: 'profile shows the username', file: 'demo/tests/profiles.spec.ts', line: 12, start: '/users/asha_rao',
     body: async (page) => {
       await eventually(async () => (await textOf(page, 'h1')) === 'asha_rao', 'username heading');
+      await page.goto(`${BASE}/users/asha_rao/notes`);
+      if ((await page.title()) !== 'User notes') throw new Error('user notes title');
+      await page.goto(`${BASE}/users/asha_rao/notes/new`);
+      if ((await page.title()) !== 'New note') throw new Error('new note title');
     },
   },
   {
-    testId: 'p2', title: 'follow button toggles', file: 'demo/tests/profiles.spec.ts', line: 14, start: '/users/ben_okafor',
+    testId: 'p2', title: 'follow button toggles', file: 'demo/tests/profiles.spec.ts', line: 21, start: '/users/ben_okafor',
     body: async (page) => {
       await page.getByRole('button', { name: 'Follow' }).click({ timeout: 2000 });
       await eventually(async () => (await page.locator('#follow').getAttribute('aria-pressed')) === 'true', 'following');
+      await page.goto(`${BASE}/users/ben_okafor/notes`);
+      if ((await page.title()) !== 'User notes') throw new Error('user notes title');
     },
   },
   {
-    testId: 'p3', title: 'profile and note open', file: 'demo/tests/profiles.spec.ts', line: 21, start: '/users/chen_li',
+    testId: 'p3', title: 'profile and note open', file: 'demo/tests/profiles.spec.ts', line: 30, start: '/users/chen_li',
     body: async (page) => {
       if ((await page.title()) !== 'Profile') throw new Error('title');
+      await page.goto(`${BASE}/users/chen_li/notes`);
+      if ((await page.title()) !== 'User notes') throw new Error('user notes title');
       await page.goto(`${BASE}/notes/cmusge6wr0004pndce18dw4iq`);
       if ((await page.title()) !== 'Note') throw new Error('note title');
     },
@@ -163,7 +171,7 @@ const tests: DemoTest[] = [
   },
   // demo/tests/tips.spec.ts: fails on its second invocation only (the first fault run on /api/tips)
   {
-    testId: 'f1', title: 'tip of the day loads', file: 'demo/tests/tips.spec.ts', line: 30, start: '/help/tips',
+    testId: 'f1', title: 'tip of the day loads', file: 'demo/tests/tips.spec.ts', line: 30, start: '/tips',
     body: async (page) => {
       const n = ++tipRuns;
       await eventually(async () => (await page.locator('#tip').getAttribute('data-state')) === 'ok', 'tip loaded');

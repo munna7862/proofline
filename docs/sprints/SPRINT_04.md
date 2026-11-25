@@ -83,7 +83,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   Prompt:
   > Read AGENTS.md, the founder's decision for S4-T2 and the header comment of src/page/agent.ts. Count a trusted pointerdown as an interaction only when the closest interactive element has aria-haspopup or aria-expanded. Add a demo menu that opens on pointerdown and blocks the following click (pointer-events: none on body while open), a test that opens it and picks an item, and ground truth in demo/expected.json. Update the "Tested =" rule in docs/ARCHITECTURE.md. Run npm run calibrate (before/after line) and npm run verify.
 
-- [ ] **S4-T3 Learned `:param` rework (2.5 h, approved: view rule)**
+- [x] **S4-T3 Learned `:param` rework (2.5 h, approved: view rule)**
   S4-3, folding in S3-5 and S3-12. epic-stack's `/users/<test user>` stays verbatim. In the S3-T4 demo, three unlinked top-level pages merged into `/:param`.
   Accept:
   - `learnViewParams`:

@@ -29,7 +29,7 @@ function invocation(): number {
 
 test('tip of the day loads', async ({ page }) => {
   const n = invocation();
-  await page.goto('/help/tips');
+  await page.goto('/tips');
   await expect(page.locator('#tip')).toHaveAttribute('data-state', 'ok');
   if (n === 2) throw new Error('flaky: fails on its second invocation only (demo)');
 });

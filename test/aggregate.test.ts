@@ -76,6 +76,72 @@ test('learnViewParams ignores record order', () => {
   assert.deepEqual([...learnViewParams(recs)].sort(), [...learnViewParams([...recs].reverse())].sort());
 });
 
+test('ordinary top-level pages keep their names even when each has a different visitor', () => {
+  const records = [visit('a', '/community'), visit('b', '/help'), visit('c', '/tips')];
+  assert.deepEqual(learnViewParams(records), new Map());
+});
+
+test('generated-looking first segments learn and propagate while ordinary first segments stay literal', () => {
+  const longName = 'abcdefghijklmnopqrst';
+  const records = [
+    visit('a', '/member1'),
+    visit('b', '/member2'),
+    visit('c', '/' + longName),
+    visit('d', '/about'),
+    visit('d', '/about/details'),
+    visit('d', '/member3/details'),
+  ];
+  assert.deepEqual(learnViewParams(records), new Map([
+    ['/' + longName, '/:param'],
+    ['/member1', '/:param'],
+    ['/member2', '/:param'],
+    ['/member3/details', '/:param/details'],
+  ]));
+});
+
+test('learning from nested views reaches user home pages and descendants with sparse evidence', () => {
+  const records = [
+    visit('a', '/users/asha/notes/:id'),
+    visit('b', '/users/ben/notes/:id'),
+    visit('c', '/users/chen/notes/:id'),
+    visit('a', '/users/asha/notes/new'),
+    visit('b', '/users/ben/notes/new'),
+    visit('d', '/users/dev'),
+    visit('d', '/users/dev/settings'),
+    visit('a', '/admin/asha/notes/new'),
+    visit('a', '/users/:id/notes/new'),
+  ];
+  const expected = new Map([
+    ['/users/asha/notes/:id', '/users/:param/notes/:id'],
+    ['/users/asha/notes/new', '/users/:param/notes/new'],
+    ['/users/ben/notes/:id', '/users/:param/notes/:id'],
+    ['/users/ben/notes/new', '/users/:param/notes/new'],
+    ['/users/chen/notes/:id', '/users/:param/notes/:id'],
+    ['/users/dev', '/users/:param'],
+    ['/users/dev/settings', '/users/:param/settings'],
+  ]);
+  assert.deepEqual(learnViewParams(records), expected);
+  assert.deepEqual(learnViewParams([...records].reverse()), expected);
+});
+
+test('independently shared sibling branches remain literal under a learned parent', () => {
+  const sharedNav = [el('link', 'Archive', '/users/archive')];
+  const records = [
+    visit('a', '/users/asha', sharedNav),
+    visit('b', '/users/ben', sharedNav),
+    visit('c', '/users/chen'),
+    visit('a', '/users/links'),
+    visit('b', '/users/links'),
+    visit('c', '/users/links/settings'),
+    visit('a', '/users/archive/settings'),
+  ];
+  assert.deepEqual(learnViewParams(records), new Map([
+    ['/users/asha', '/users/:param'],
+    ['/users/ben', '/users/:param'],
+    ['/users/chen', '/users/:param'],
+  ]));
+});
+
 const off = (role: string, name: string) => ({ ...el(role, name), disabled: true });
 
 test('an element never seen enabled is not applicable and outside the score', () => {

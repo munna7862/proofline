@@ -3,17 +3,18 @@ import type { CoverageSummary, ElementCoverage, ElementInfo, TestCoverageRecord,
 /** Minimum number of distinct per-test values before a path segment becomes :param. */
 const LEARNED_PARAM_MIN_VALUES = 3;
 
+function canLearnSegment(segment: string, index: number): boolean {
+  return !!segment && !segment.startsWith(':') && !segment.includes('#') &&
+    (index !== 1 || /\d/.test(segment) || segment.length >= 20);
+}
+
 /**
- * Learns per-test path segments in view keys (faker usernames, slugs a test creates)
- * and maps each such view to one with the segment replaced by `:param`.
+ * Learns per-test path segments from views with the same parent and suffix.
  *
- * A segment position collapses when, for the same surrounding path, at least 3 values
- * qualify, coming from at least 3 different tests. A value qualifies when:
- *  - exactly one test visited that view, and
- *  - it is not a fixed link: no link to that view appears in the inventory of 2+ tests
- *    (a nav menu listing /docs/intro, /docs/api, /docs/faq keeps those pages apart).
- * Values that do not qualify keep their own view. Already-normalized segments (:id,
- * :uuid, :hash) and the hash-router marker segment are never touched.
+ * Three distinct values from three single-test visits establish the position.
+ * Shared links do not provide evidence. The learned position applies across suffixes,
+ * including user home pages, while shared sibling branches with no qualifying
+ * evidence keep their literal names.
  * Pure and deterministic: the result depends only on the records, not their order.
  */
 export function learnViewParams(records: TestCoverageRecord[]): Map<string, string> {
@@ -34,35 +35,43 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
     }
   }
 
-  // pattern (segments with one position blanked) -> qualifying views at that position
-  const groups = new Map<string, { index: number; views: string[] }>();
-  for (const view of [...visitors.keys()].sort()) {
+  const paths = [...visitors.keys()].sort().map((view) => ({ view, segments: view.split('/') }));
+  const groups = new Map<string, { parent: string; examples: Map<string, string> }>();
+  const isSharedLink = (view: string) => (linkedBy.get(view)?.size ?? 0) >= 2;
+  for (const { view, segments } of paths) {
     const tests = visitors.get(view)!;
-    if (tests.size !== 1 || (linkedBy.get(view)?.size ?? 0) >= 2) continue;
-    const segs = view.split('/');
-    segs.forEach((seg, i) => {
-      if (seg === '' || seg.startsWith(':') || seg.includes('#')) return;
-      const pattern = segs.map((s, j) => (j === i ? '\0' : s)).join('/');
-      const g = groups.get(pattern) ?? { index: i, views: [] };
-      g.views.push(view);
-      groups.set(pattern, g);
+    if (tests.size !== 1 || isSharedLink(view)) continue;
+    segments.forEach((segment, index) => {
+      if (!canLearnSegment(segment, index)) return;
+      const parent = segments.slice(0, index).join('/');
+      if (isSharedLink(`${parent}/${segment}`)) return;
+      const pattern = JSON.stringify([parent, segments.slice(index + 1)]);
+      const group = groups.get(pattern) ?? { parent, examples: new Map<string, string>() };
+      group.examples.set(segment, [...tests][0]!);
+      groups.set(pattern, group);
     });
   }
 
-  const collapse = new Map<string, Set<number>>();
-  for (const g of groups.values()) {
-    const tests = new Set(g.views.map((v) => [...visitors.get(v)!][0]));
-    if (g.views.length < LEARNED_PARAM_MIN_VALUES || tests.size < LEARNED_PARAM_MIN_VALUES) continue;
-    for (const v of g.views) {
-      const at = collapse.get(v) ?? new Set<number>();
-      at.add(g.index);
-      collapse.set(v, at);
-    }
+  const learnedParents = new Map<string, Set<string>>();
+  for (const { parent, examples } of groups.values()) {
+    if (new Set(examples.values()).size < LEARNED_PARAM_MIN_VALUES) continue;
+    const values = learnedParents.get(parent) ?? new Set<string>();
+    for (const segment of examples.keys()) values.add(segment);
+    learnedParents.set(parent, values);
   }
 
   const out = new Map<string, string>();
-  for (const [view, at] of collapse) {
-    out.set(view, view.split('/').map((s, i) => (at.has(i) ? ':param' : s)).join('/'));
+  for (const { view, segments } of paths) {
+    const mapped = segments.map((segment, index) => {
+      if (!canLearnSegment(segment, index)) return segment;
+      const parent = segments.slice(0, index).join('/');
+      const learnedValues = learnedParents.get(parent);
+      if (!learnedValues) return segment;
+      const branch = `${parent}/${segment}`;
+      const sharedBranch = isSharedLink(branch) || (visitors.get(branch)?.size ?? 0) >= 2;
+      return sharedBranch && !learnedValues.has(segment) ? segment : ':param';
+    }).join('/');
+    if (mapped !== view) out.set(view, mapped);
   }
   return out;
 }

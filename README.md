@@ -64,6 +64,8 @@ export const test = mergeTests(mine, proofline);
 
 Coverage reports group three or more different labels at the same control location in a view as “per test (N seen)” when each label appears in exactly one test. Labels seen by multiple tests keep their own entries.
 
+When Proofline learns a per-test URL parameter, views such as `/users/:param` and `/users/:param/notes` use the same parameter position. Top-level paths such as `/help` and `/tips` keep their names.
+
 ## Develop
 
 ```bash
