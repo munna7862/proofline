@@ -384,6 +384,8 @@ export function proofAgent(opts: AgentOptions): void {
     if (!target || typeof (target as any).closest !== 'function') return;
     const el = target.closest(opts.interactiveSelector);
     if (!el || isIgnored(el)) return;
+    // Browsers can deliver pointerdown to a child of a disabled button even though clicks are suppressed.
+    if (ev.type === 'pointerdown' && (!el.matches('[aria-haspopup],[aria-expanded]') || el.matches(':disabled'))) return;
     const d = describe(el);
     const view = viewOf(location.href);
     // The element the test just used is live in this view (even one held after a route change):
@@ -400,7 +402,7 @@ export function proofAgent(opts: AgentOptions): void {
     scheduleScan();
   };
 
-  ['click', 'dblclick', 'contextmenu', 'input', 'change'].forEach((t) =>
+  ['click', 'dblclick', 'contextmenu', 'input', 'change', 'pointerdown'].forEach((t) =>
     document.addEventListener(t, onEvent, true),
   );
 

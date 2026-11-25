@@ -107,7 +107,7 @@ function coverageSection(c: CoverageSummary): string {
 
   return `<section id="coverage">
     <h2>UI coverage</h2>
-    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. Links count only when clicked. Elements only ever seen disabled or busy are not applicable and stay out of the score.</p>
+    <p class="lede">What your tests touched. An element counts once a test clicks, types into, or changes it. Pressing a menu or disclosure trigger also counts. Elements only ever seen disabled or busy are not applicable and stay out of the score.</p>
     <div class="views">${views}</div>
     ${links}
   </section>`;
