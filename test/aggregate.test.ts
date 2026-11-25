@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { aggregateCoverage, groupListItems, learnViewParams } from '../src/coverage/aggregate.ts';
 import type { ElementInfo, TestCoverageRecord } from '../src/types.ts';
+import { viewKey } from '../src/util/normalize.ts';
 
 const el = (role: string, name: string, href?: string) => ({ key: `${role}|${name}|`, tag: 'x', role, name, href, path: 'x' });
 
@@ -81,6 +82,41 @@ test('ordinary top-level pages keep their names even when each has a different v
   assert.deepEqual(learnViewParams(records), new Map());
 });
 
+test('first-segment protection applies to URL-encoded pages and hash routes', () => {
+  for (const paths of [
+    ['/café', '/über', '/niño'],
+    ['//about', '//help', '//tips'],
+    ['/#/about', '/#/help', '/#/tips'],
+    ['/app#/about', '/app#/help', '/app#/tips'],
+  ]) {
+    const records = paths.map((path, index) => visit(String(index), viewKey('https://example.test' + path)));
+    assert.deepEqual(learnViewParams(records), new Map(), paths.join(', '));
+  }
+});
+
+test('generated hash-route first segments can still propagate', () => {
+  const records = [
+    visit('a', '/app#/member1'),
+    visit('b', '/app#/member2'),
+    visit('c', '/app#/member3'),
+    visit('a', '/app#/member1/settings'),
+  ];
+  assert.equal(learnViewParams(records).get('/app#/member1/settings'), '/app#/:param/settings');
+});
+
+test('a learned segment immediately before a hash route keeps its parameter', () => {
+  const records = [
+    visit('a', '/users/asha'),
+    visit('b', '/users/ben'),
+    visit('c', '/users/chen'),
+    visit('a', '/users/asha#/notes'),
+    visit('b', '/users/:id#/notes'),
+  ];
+  const learned = learnViewParams(records);
+  assert.equal(learned.get('/users/asha#/notes'), '/users/:param#/notes');
+  assert.equal(learned.has('/users/:id#/notes'), false);
+});
+
 test('generated-looking first segments learn and propagate while ordinary first segments stay literal', () => {
   const longName = 'abcdefghijklmnopqrst';
   const records = [
@@ -140,6 +176,23 @@ test('independently shared sibling branches remain literal under a learned paren
     ['/users/ben', '/users/:param'],
     ['/users/chen', '/users/:param'],
   ]));
+});
+
+test('a shared link to a fixed descendant keeps its own coverage row', () => {
+  const settings = '/users/archive/settings';
+  const sharedNav = [el('link', 'Archive settings', settings)];
+  const save = el('button', 'Save');
+  const records = [
+    visit('a', '/users/asha', sharedNav),
+    visit('b', '/users/ben', sharedNav),
+    visit('c', '/users/chen', sharedNav),
+    visit('a', '/users/asha/settings', [save], [save.key]),
+    visit('d', settings, [save]),
+  ];
+  const summary = aggregateCoverage(records);
+  const archive = summary.views.find((view) => view.view === settings);
+  assert.deepEqual(archive?.elements.map((element) => [element.name, element.tested]), [['Save', false]]);
+  assert.equal(summary.views.find((view) => view.view === '/users/:param/settings')?.tested, 1);
 });
 
 const off = (role: string, name: string) => ({ ...el(role, name), disabled: true });

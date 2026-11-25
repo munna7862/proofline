@@ -3,9 +3,27 @@ import type { CoverageSummary, ElementCoverage, ElementInfo, TestCoverageRecord,
 /** Minimum number of distinct per-test values before a path segment becomes :param. */
 const LEARNED_PARAM_MIN_VALUES = 3;
 
-function canLearnSegment(segment: string, index: number): boolean {
-  return !!segment && !segment.startsWith(':') && !segment.includes('#') &&
-    (index !== 1 || /\d/.test(segment) || segment.length >= 20);
+function firstPathSegments(segments: string[]): Set<number> {
+  const first = new Set([segments.findIndex(Boolean)]);
+  const hash = segments.indexOf('#');
+  if (hash !== -1) first.add(segments.findIndex((segment, index) => index > hash && !!segment));
+  return first;
+}
+
+// Keep the hash boundary separate so the final pathname segment can be learned too.
+const splitViewPath = (view: string) => view.replace('#/', '/#/').split('/');
+const restoreHashBoundary = (path: string) => path.replace('/#/', '#/');
+
+function canLearnSegment(segment: string, first: boolean): boolean {
+  if (!segment || segment.startsWith(':') || segment.includes('#')) return false;
+  if (!first) return true;
+  try {
+    // URL.pathname encodes characters such as é as percent escapes that contain digits.
+    const decoded = decodeURIComponent(segment);
+    return /\d/.test(decoded) || Array.from(decoded).length >= 20;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -35,16 +53,19 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
     }
   }
 
-  const paths = [...visitors.keys()].sort().map((view) => ({ view, segments: view.split('/') }));
+  const paths = [...visitors.keys()].sort().map((view) => {
+    const segments = splitViewPath(view);
+    return { view, segments, first: firstPathSegments(segments) };
+  });
   const groups = new Map<string, { parent: string; examples: Map<string, string> }>();
   const isSharedLink = (view: string) => (linkedBy.get(view)?.size ?? 0) >= 2;
-  for (const { view, segments } of paths) {
+  for (const { view, segments, first } of paths) {
     const tests = visitors.get(view)!;
     if (tests.size !== 1 || isSharedLink(view)) continue;
     segments.forEach((segment, index) => {
-      if (!canLearnSegment(segment, index)) return;
+      if (!canLearnSegment(segment, first.has(index))) return;
       const parent = segments.slice(0, index).join('/');
-      if (isSharedLink(`${parent}/${segment}`)) return;
+      if (isSharedLink(restoreHashBoundary(`${parent}/${segment}`))) return;
       const pattern = JSON.stringify([parent, segments.slice(index + 1)]);
       const group = groups.get(pattern) ?? { parent, examples: new Map<string, string>() };
       group.examples.set(segment, [...tests][0]!);
@@ -61,17 +82,19 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
   }
 
   const out = new Map<string, string>();
-  for (const { view, segments } of paths) {
+  for (const { view, segments, first } of paths) {
+    if (isSharedLink(view)) continue;
     const mapped = segments.map((segment, index) => {
-      if (!canLearnSegment(segment, index)) return segment;
+      if (!canLearnSegment(segment, first.has(index))) return segment;
       const parent = segments.slice(0, index).join('/');
       const learnedValues = learnedParents.get(parent);
       if (!learnedValues) return segment;
-      const branch = `${parent}/${segment}`;
+      const branch = restoreHashBoundary(`${parent}/${segment}`);
       const sharedBranch = isSharedLink(branch) || (visitors.get(branch)?.size ?? 0) >= 2;
       return sharedBranch && !learnedValues.has(segment) ? segment : ':param';
     }).join('/');
-    if (mapped !== view) out.set(view, mapped);
+    const mappedView = restoreHashBoundary(mapped);
+    if (mappedView !== view) out.set(view, mappedView);
   }
   return out;
 }
