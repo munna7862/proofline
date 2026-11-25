@@ -44,6 +44,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 S4-T1 review follow-up. The threshold counts qualifying labels, shared labels stay separate even when also seen disabled, and grouped untouched links retain their common visited destination. Verify passed with 60 of 60 unit tests and calibration reporting `UI coverage 55.2% (16/29) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 - 2026-11-25 S4-T2 done. The demo adds five scored controls. The menu trigger, menu item, and disclosure count as tested, and the disabled menu trigger stays outside the score. Verify passed with 60 of 60 unit tests and calibration reporting `UI coverage 55.9% (19/34) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+- 2026-11-25 S4-T2 review follow-up. The HTML report explains how an interaction affects controls seen only while disabled or busy. Verify passed with 60 of 60 unit tests and calibration reporting `UI coverage 55.9% (19/34) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`. Both Windows Playwright coverage runs matched ground truth at 19 of 34.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):
