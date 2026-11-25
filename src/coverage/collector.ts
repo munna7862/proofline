@@ -10,6 +10,11 @@ interface Observation {
   order: number;
 }
 
+function retainPosition(preferred: ElementInfo, other: ElementInfo): ElementInfo {
+  if (other.position === undefined || preferred.position === other.position) return preferred;
+  return { ...preferred, position: preferred.position === undefined ? other.position : null };
+}
+
 /**
  * Accumulates what one test saw and touched. Runner-agnostic: the Playwright
  * fixture, the calibration script, and future adapters (WebdriverIO via CDP)
@@ -32,7 +37,9 @@ export class CoverageRecorder {
         const prev = map.get(id);
         // An element seen enabled once is enabled for this test.
         if (!prev || (prev.element.disabled && !el.disabled)) {
-          map.set(id, { element: el, order: this.nextObservation++ });
+          map.set(id, { element: prev ? retainPosition(el, prev.element) : el, order: this.nextObservation++ });
+        } else {
+          prev.element = retainPosition(prev.element, el);
         }
       }
       this.inventory.set(msg.view, map);
@@ -42,7 +49,7 @@ export class CoverageRecorder {
       const id = identity(element.key, msg.nodeId);
       const prev = map.get(id);
       if (prev && !prev.element.disabled) delete element.disabled;
-      map.set(id, { element, order: this.nextObservation++ });
+      map.set(id, { element: prev ? retainPosition(element, prev.element) : element, order: this.nextObservation++ });
       this.inventory.set(msg.view, map);
     } else if (msg.type === 'interaction') {
       const set = this.interactions.get(msg.view) ?? new Set<string>();
@@ -60,7 +67,9 @@ export class CoverageRecorder {
         const prev = byKey.get(element.key);
         if (!prev || (prev.element.disabled && !element.disabled) ||
             (!!prev.element.disabled === !!element.disabled && order < prev.order)) {
-          byKey.set(element.key, observation);
+          byKey.set(element.key, { element: prev ? retainPosition(element, prev.element) : element, order });
+        } else {
+          prev.element = retainPosition(prev.element, element);
         }
       }
       inventory[view] = [...byKey.values()].map(({ element }) => element);

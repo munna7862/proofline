@@ -67,3 +67,21 @@ test('same-key fields keep the metadata of the first field seen enabled', () => 
   }
   assert.deepEqual(r.toRecord(ref).inventory['/'], [{ ...field('Initial'), path: 'input#second' }]);
 });
+
+test('position changes remain ambiguous when an element is observed again', () => {
+  const r = new CoverageRecorder();
+  for (const position of ['a:0', 'a:1', 'a:0']) {
+    r.handle({ type: 'inventory', view: '/', elements: [{ ...btn(), position }] });
+  }
+  assert.deepEqual(r.toRecord(ref).inventory['/'], [{ ...btn(), position: null }]);
+});
+
+test('renamed fields retain position ambiguity and prior interactions', () => {
+  const r = new CoverageRecorder();
+  r.handle({ type: 'inventory', view: '/', elements: [{ ...field('Initial'), nodeId: 'doc:1', position: 'input:0' }] });
+  r.handle({ type: 'interaction', view: '/', key: 'textbox|Initial|', nodeId: 'doc:1', event: 'input' });
+  r.handle({ type: 'rename', view: '/', nodeId: 'doc:1', element: { ...field('Password'), position: 'input:1' } });
+  const record = r.toRecord(ref);
+  assert.deepEqual(record.inventory['/'], [{ ...field('Password'), position: null }]);
+  assert.deepEqual(record.interactions['/'], ['textbox|Password|']);
+});

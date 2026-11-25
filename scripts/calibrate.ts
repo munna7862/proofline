@@ -112,7 +112,10 @@ const tests: DemoTest[] = [
       const notes = page.getByRole('link', { name: `${user}'s notes` });
       await notes.waitFor({ timeout: 2000 });
       await page.getByRole('link', { name: 'Back to shop' }).waitFor({ timeout: 2000 });
-      if (user === 'asha_rao') await notes.click({ timeout: 2000 });
+      if (user === 'asha_rao') {
+        await page.getByRole('link', { name: 'Cart help' }).waitFor({ timeout: 2000 });
+        await notes.click({ timeout: 2000 });
+      }
     },
   })),
   // demo/tests/avatar.spec.ts: busy-state button and an unlabelled file input (no phantom elements)

@@ -306,6 +306,63 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
 
+  // The display path deliberately omits sibling positions. Record them separately
+  // so distinct controls with identical markup do not look like renamed versions
+  // of each other. Cache within one scan or interaction, while the DOM is unchanged.
+  const positionsInSnapshot = () => {
+    const positions = new WeakMap<Element, string>();
+    const indexes = new WeakMap<Element, number>();
+    let idCounts: Map<string, number> | undefined;
+    const hasUniqueId = (id: string): boolean => {
+      if (!idCounts) {
+        idCounts = new Map();
+        for (const node of document.querySelectorAll('[id]')) {
+          const value = node.getAttribute('id')!;
+          idCounts.set(value, (idCounts.get(value) ?? 0) + 1);
+        }
+      }
+      return idCounts.get(id) === 1;
+    };
+    const part = (node: Element): string => {
+      const parent = node.parentElement;
+      if (parent && !indexes.has(node)) {
+        const counts = new Map<string, number>();
+        for (const child of parent.children) {
+          const index = counts.get(child.localName) ?? 0;
+          indexes.set(child, index);
+          counts.set(child.localName, index + 1);
+        }
+      }
+      return `${node.localName}:${indexes.get(node) ?? 0}`;
+    };
+    return (el: Element): string => {
+      const relative: string[] = [];
+      for (let node: Element | null = el; node && relative.length < 4; node = node.parentElement) {
+        // The same ID already anchors the display path, so unrelated changes above it are irrelevant.
+        const id = node.getAttribute('id');
+        if (id) {
+          if (hasUniqueId(id)) return relative.reverse().join('/') || 'self';
+          break;
+        }
+        relative.push(part(node));
+      }
+      let ancestor: Element | null = el;
+      const unvisited: Element[] = [];
+      while (ancestor && !positions.has(ancestor)) {
+        unvisited.push(ancestor);
+        ancestor = ancestor.parentElement;
+      }
+      let prefix = ancestor ? `${positions.get(ancestor)}/` : '';
+      while (unvisited.length) {
+        const node = unvisited.pop()!;
+        const position = `${prefix}${part(node)}`;
+        positions.set(node, position);
+        prefix = `${position}/`;
+      }
+      return positions.get(el)!;
+    };
+  };
+
   const describe = (el: Element) => {
     const role = roleOf(el);
     const name = nameOf(el);
@@ -341,15 +398,23 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
 
-  // key -> 'enabled' | 'disabled'. A key first seen disabled is sent again once it is seen enabled.
-  const seenPerView: Record<string, Record<string, string>> = {};
-  type FieldState = { key: string; enabled: boolean };
+  type Seen = { enabled: boolean; location: string | null };
+  const seenPerView: Record<string, Record<string, Seen>> = {};
+  type FieldState = Seen & { key: string };
   const fields = new WeakMap<Element, { id: string; views: Map<string, FieldState> }>();
   let nextField = 0;
 
-  const observe = (el: Element, view: string) => {
-    const element = describe(el);
+  const observe = (el: Element, view: string, positionOf: (el: Element) => string) => {
+    const currentPosition = positionOf(el);
+    const element: ReturnType<typeof describe> & { position: string | null } = { ...describe(el), position: currentPosition };
+    const location = [element.path, element.role, element.tag, currentPosition].join('\0');
     const enabled = !element.disabled;
+    const update = (previous: Seen | undefined) => {
+      const locationChanged = previous != null && previous.location !== null && previous.location !== location;
+      if (locationChanged || previous?.location === null) element.position = null;
+      const state = { enabled: enabled || !!previous?.enabled, location: element.position === null ? null : location };
+      return { state, fresh: !previous || locationChanged || (!previous.enabled && enabled) };
+    };
     const nativeField = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && isField(el);
     if (fields.has(el) || nativeField || isEditingHost(el) || isTextbox(el)) {
       let field = fields.get(el);
@@ -360,17 +425,17 @@ export function proofAgent(opts: AgentOptions): void {
         fields.set(el, field);
       }
       const previous = field.views.get(view);
-      field.views.set(view, { key: element.key, enabled: enabled || !!previous?.enabled });
+      const { state, fresh } = update(previous);
+      field.views.set(view, { key: element.key, ...state });
       if (previous && previous.key !== element.key) {
         emit({ type: 'rename', view, nodeId: field.id, element });
         return { element, nodeId: field.id, fresh: false };
       }
-      return { element, nodeId: field.id, fresh: !previous || (!previous.enabled && enabled) };
+      return { element, nodeId: field.id, fresh };
     }
     const seen = (seenPerView[view] = seenPerView[view] || {});
-    const state = enabled ? 'enabled' : 'disabled';
-    const fresh = seen[element.key] !== 'enabled' && seen[element.key] !== state;
-    if (fresh) seen[element.key] = state;
+    const { state, fresh } = update(seen[element.key]);
+    seen[element.key] = state;
     return { element, nodeId: undefined, fresh };
   };
 
@@ -404,13 +469,14 @@ export function proofAgent(opts: AgentOptions): void {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
     document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     const view = viewOf(location.href);
+    const positionOf = positionsInSnapshot();
     const fresh: any[] = [];
     const holding = !final && Date.now() - changedAt < HOLD_MS;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
       if (isIgnored(el)) return;
       if (!isVisible(el)) return;
-      const entry = observe(el, view);
+      const entry = observe(el, view, positionOf);
       if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId });
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
@@ -430,12 +496,12 @@ export function proofAgent(opts: AgentOptions): void {
     (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
     ((ev.target as HTMLInputElement).type || '').toLowerCase() === 'file';
 
-  const credit = (el: Element, view: string, event: string) => {
+  const credit = (el: Element, view: string, event: string, positionOf: (el: Element) => string) => {
     // The element the test just used is live in this view (even one held after a route change):
     // record it now, before the test can navigate away ahead of the next scan, so every
     // interaction has an inventory entry.
     carried.delete(el);
-    const { element, nodeId, fresh } = observe(el, view);
+    const { element, nodeId, fresh } = observe(el, view, positionOf);
     if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId }] });
     emit({ type: 'interaction', view, key: element.key, nodeId, event });
   };
@@ -452,7 +518,8 @@ export function proofAgent(opts: AgentOptions): void {
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
     if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
     const view = viewOf(location.href);
-    credit(el, view, ev.type);
+    const positionOf = positionsInSnapshot();
+    credit(el, view, ev.type, positionOf);
     if (ev.isTrusted) {
       const wrapper = el.parentElement?.closest(opts.interactiveSelector);
       if (wrapper && (roleOf(wrapper) === 'link' || roleOf(wrapper) === 'button') &&
@@ -460,7 +527,7 @@ export function proofAgent(opts: AgentOptions): void {
           !Array.from(wrapper.querySelectorAll(opts.interactiveSelector)).some(
             (descendant) => descendant !== el && !isIgnored(descendant) && isVisible(descendant),
           )) {
-        credit(wrapper, view, ev.type);
+        credit(wrapper, view, ev.type, positionOf);
       }
     }
     scheduleScan();

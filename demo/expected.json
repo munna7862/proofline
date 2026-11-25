@@ -13,7 +13,7 @@
     "/users/:param": ["button|Follow|", "link|Back to shop|"],
     "/users/:param/notes": ["link|Back to shop|"],
     "/users/:param/notes/new": ["link|Back to shop|"],
-    "/users/links": ["link|per test|nav#user-links > a", "link|Back to shop|"],
+    "/users/links": ["link|per test|nav#user-links > a", "link|Back to shop|", "link|Catalog archive|", "link|Store policies|", "link|Cart help|", "link|Store hours|", "link|Return help|", "link|Cart details|", "link|About the shop|", "link|Return terms|", "link|Cart guide|"],
     "/notes/:id": ["link|Back to shop|"],
     "/settings/avatar": ["button|Upload|", "textbox|avatar|"],
     "/settings/drafts#/editor": ["generic|note|", "generic|Plain note|", "generic|rich-note|", "button|Accept|", "button|Reject|", "button|Lock draft|", "button|Preview|", "link||", "link|Draft view|"],
