@@ -57,3 +57,13 @@ test('a field name change stays scoped to the view where it was observed', () =>
   r.handle({ type: 'rename', view: '/later', nodeId: 'doc:1', element: field('Password') });
   assert.deepEqual(r.toRecord(ref).inventory, { '/early': [field('Initial')], '/later': [field('Password')] });
 });
+
+test('same-key fields keep the metadata of the first field seen enabled', () => {
+  const r = new CoverageRecorder();
+  const first = { ...field('Initial'), nodeId: 'doc:1', path: 'input#first', list: 'li > input' };
+  const second = { ...field('Initial'), nodeId: 'doc:2', path: 'input#second' };
+  for (const el of [{ ...first, disabled: true }, second, first]) {
+    r.handle({ type: 'inventory', view: '/', elements: [el] });
+  }
+  assert.deepEqual(r.toRecord(ref).inventory['/'], [{ ...field('Initial'), path: 'input#second' }]);
+});

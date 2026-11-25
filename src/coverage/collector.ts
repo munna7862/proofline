@@ -5,6 +5,11 @@ import type { AgentMessage, ElementInfo, TestCoverageRecord } from '../types.ts'
 export const BINDING_NAME = '__proofline_emit';
 const identity = (key: string, nodeId?: string) => nodeId === undefined ? `key:${key}` : `node:${nodeId}`;
 
+interface Observation {
+  element: ElementInfo;
+  order: number;
+}
+
 /**
  * Accumulates what one test saw and touched. Runner-agnostic: the Playwright
  * fixture, the calibration script, and future adapters (WebdriverIO via CDP)
@@ -12,29 +17,32 @@ const identity = (key: string, nodeId?: string) => nodeId === undefined ? `key:$
  */
 export class CoverageRecorder {
   private views = new Set<string>();
-  private inventory = new Map<string, Map<string, ElementInfo>>();
+  private inventory = new Map<string, Map<string, Observation>>();
   private interactions = new Map<string, Set<string>>();
+  private nextObservation = 0;
 
   handle = (msg: AgentMessage): void => {
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'view') {
       this.views.add(msg.view);
     } else if (msg.type === 'inventory') {
-      const map = this.inventory.get(msg.view) ?? new Map<string, ElementInfo>();
+      const map = this.inventory.get(msg.view) ?? new Map<string, Observation>();
       for (const { nodeId, ...el } of msg.elements) {
         const id = identity(el.key, nodeId);
         const prev = map.get(id);
         // An element seen enabled once is enabled for this test.
-        if (!prev || (prev.disabled && !el.disabled)) map.set(id, el);
+        if (!prev || (prev.element.disabled && !el.disabled)) {
+          map.set(id, { element: el, order: this.nextObservation++ });
+        }
       }
       this.inventory.set(msg.view, map);
     } else if (msg.type === 'rename') {
-      const map = this.inventory.get(msg.view) ?? new Map<string, ElementInfo>();
+      const map = this.inventory.get(msg.view) ?? new Map<string, Observation>();
       const element = { ...msg.element };
       const id = identity(element.key, msg.nodeId);
       const prev = map.get(id);
-      if (prev && !prev.disabled) delete element.disabled;
-      map.set(id, element);
+      if (prev && !prev.element.disabled) delete element.disabled;
+      map.set(id, { element, order: this.nextObservation++ });
       this.inventory.set(msg.view, map);
     } else if (msg.type === 'interaction') {
       const set = this.interactions.get(msg.view) ?? new Set<string>();
@@ -46,12 +54,16 @@ export class CoverageRecorder {
   toRecord(test: { testId: string; title: string; file: string; line: number; status?: string }): TestCoverageRecord {
     const inventory: Record<string, ElementInfo[]> = {};
     for (const [view, map] of this.inventory) {
-      const byKey = new Map<string, ElementInfo>();
-      for (const el of map.values()) {
-        const prev = byKey.get(el.key);
-        if (!prev || (prev.disabled && !el.disabled)) byKey.set(el.key, el);
+      const byKey = new Map<string, Observation>();
+      for (const observation of map.values()) {
+        const { element, order } = observation;
+        const prev = byKey.get(element.key);
+        if (!prev || (prev.element.disabled && !element.disabled) ||
+            (!!prev.element.disabled === !!element.disabled && order < prev.order)) {
+          byKey.set(element.key, observation);
+        }
       }
-      inventory[view] = [...byKey.values()];
+      inventory[view] = [...byKey.values()].map(({ element }) => element);
     }
     const interactions: Record<string, string[]> = {};
     for (const [view, set] of this.interactions) {
@@ -60,8 +72,8 @@ export class CoverageRecorder {
       for (const id of set) {
         if (id.startsWith('key:')) keys.add(id.slice(4));
         else {
-          const element = map?.get(id);
-          if (element) keys.add(element.key);
+          const observation = map?.get(id);
+          if (observation) keys.add(observation.element.key);
         }
       }
       interactions[view] = [...keys];

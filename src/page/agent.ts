@@ -93,6 +93,16 @@ export function proofAgent(opts: AgentOptions): void {
   if (w.__prooflineInstalled) return;
   w.__prooflineInstalled = true;
 
+  // Create the document namespace before app code can replace browser methods.
+  // It stays inside the collector and never appears in coverage artifacts.
+  const documentId = (() => {
+    try {
+      return crypto.getRandomValues(new Uint32Array(4)).join('-');
+    } catch {
+      return `${performance.timeOrigin}-${Math.random()}`;
+    }
+  })();
+
   const emit = (msg: unknown) => {
     try {
       const fn = w[opts.bindingName];
@@ -170,22 +180,39 @@ export function proofAgent(opts: AgentOptions): void {
     return false;
   };
 
-  // User-entered values are not labels. Contenteditable stores its value in DOM text.
-  const isField = (el: Element) => {
+  const textboxes = new WeakSet<Element>();
+  const isTextbox = (el: Element) => {
+    if (el.getAttribute('role') === 'textbox') textboxes.add(el);
+    return textboxes.has(el);
+  };
+
+  const hasValueText = (el: Element) => {
     if (isDraftContent(el)) return true;
+    for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+      if (isTextbox(cur)) return true;
+    }
+    return false;
+  };
+
+  // User-entered values are not labels. Contenteditable stores its value in DOM text.
+  const valueFields = new WeakSet<Element>();
+  const isField = (el: Element) => {
+    if (isDraftContent(el) || isTextbox(el)) return true;
     const tag = el.tagName;
-    if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
-    if (tag !== 'INPUT') return false;
-    const t = ((el as HTMLInputElement).type || 'text').toLowerCase();
-    return t !== 'submit' && t !== 'button' && t !== 'reset' && t !== 'image';
+    if (tag === 'TEXTAREA' || tag === 'SELECT') valueFields.add(el);
+    if (tag === 'INPUT') {
+      const type = (el as HTMLInputElement).type;
+      if (type !== 'submit' && type !== 'button' && type !== 'reset' && type !== 'image') valueFields.add(el);
+    }
+    return valueFields.has(el);
   };
 
   const labelText = (el: Element, rendered = false): string => {
-    if (isDraftContent(el)) return '';
-    if (!Array.from(el.getElementsByTagName('*')).some(isEditingHost)) {
+    if (hasValueText(el)) return '';
+    if (!Array.from(el.getElementsByTagName('*')).some((child) => isEditingHost(child) || isTextbox(child))) {
       return (rendered && (el as HTMLElement).innerText) || el.textContent || '';
     }
-    // Drop editable subtrees even when a surrounding control or aria-labelledby supplies the name.
+    // Drop value subtrees even when a surrounding control or aria-labelledby supplies the name.
     return Array.from(el.childNodes, (node) =>
       node instanceof Element ? labelText(node, rendered) : node.nodeType === 3 ? node.textContent : '',
     ).join('');
@@ -318,18 +345,17 @@ export function proofAgent(opts: AgentOptions): void {
   const seenPerView: Record<string, Record<string, string>> = {};
   type FieldState = { key: string; enabled: boolean };
   const fields = new WeakMap<Element, { id: string; views: Map<string, FieldState> }>();
-  let documentId: string | undefined;
   let nextField = 0;
 
   const observe = (el: Element, view: string) => {
     const element = describe(el);
     const enabled = !element.disabled;
-    if ((el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && isField(el)) {
+    const nativeField = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && isField(el);
+    if (fields.has(el) || nativeField || isEditingHost(el) || isTextbox(el)) {
       let field = fields.get(el);
       if (!field) {
         // A frame can navigate or another frame can observe the same view. Keep IDs
         // distinct across documents, and strip them before writing the coverage record.
-        documentId ??= crypto.getRandomValues(new Uint32Array(4)).join('-');
         field = { id: `${documentId}:${++nextField}`, views: new Map() };
         fields.set(el, field);
       }
@@ -431,7 +457,9 @@ export function proofAgent(opts: AgentOptions): void {
       const wrapper = el.parentElement?.closest(opts.interactiveSelector);
       if (wrapper && (roleOf(wrapper) === 'link' || roleOf(wrapper) === 'button') &&
           !wrapper.matches(':disabled') && (ev.type !== 'pointerdown' || isPointerTrigger(wrapper)) &&
-          wrapper.querySelectorAll(opts.interactiveSelector).length === 1) {
+          !Array.from(wrapper.querySelectorAll(opts.interactiveSelector)).some(
+            (descendant) => descendant !== el && !isIgnored(descendant) && isVisible(descendant),
+          )) {
         credit(wrapper, view, ev.type);
       }
     }
@@ -479,7 +507,7 @@ export function proofAgent(opts: AgentOptions): void {
       attributes: true,
       attributeOldValue: true,
       attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable',
-        'id', 'name', 'type', 'for', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
+        'id', 'name', 'type', 'for', 'role', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
         'data-testid', 'data-test', 'data-cy'],
     });
   };

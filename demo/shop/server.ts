@@ -166,10 +166,12 @@ render();
 
 const CHECKOUT_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Checkout</title></head><body>
 <h1>Checkout</h1>
-<a href="/cart" id="checkout-link" aria-label="Checkout link"><button type="button" id="checkout">Proceed to checkout</button></a>
-<a href="/about" id="options-link" aria-label="Options link"><button type="button" id="edit">Edit</button><button type="button" id="cancel">Cancel</button></a>
+<a href="/cart" id="checkout-link" aria-label="Checkout link"><button type="button" id="checkout">Proceed to checkout</button><span data-focus-guard tabindex="0"></span><button hidden>Hidden option</button></a>
+<a href="/about" id="options-link" aria-labelledby="order-reference-label"><button type="button" id="edit">Edit</button><button type="button" id="cancel" aria-labelledby="reference-value">Cancel</button></a>
 <label for="checkout-password">Password</label>
 <input name="initial_password" type="password">
+<div id="checkout-note" contenteditable="true" role="textbox" aria-label="Draft note"></div>
+<div id="order-reference-label">Options link<div id="order-reference" role="textbox" tabindex="0"><span id="reference-value">ProoflineCustomFieldMarker</span></div></div>
 <p id="selection"></p>
 <script>
 for (const link of document.querySelectorAll('a')) {
@@ -181,6 +183,9 @@ document.getElementById('checkout').addEventListener('click', () => {
 document.getElementById('edit').addEventListener('click', () => {
   document.getElementById('selection').textContent = 'Editing options';
 });
+document.getElementById('checkout-note').addEventListener('input', (event) => {
+  event.target.setAttribute('aria-label', 'Order note');
+}, { once: true });
 setTimeout(() => { document.querySelector('input').id = 'checkout-password'; }, 300);
 </script>
 </body></html>`;

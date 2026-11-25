@@ -50,6 +50,7 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 S4-T3 review follow-up. Fixed destinations linked by multiple tests keep their views, and first-segment protection covers encoded names and hash routes. Verify passed with 68 of 68 unit tests and calibration reporting `UI coverage 51.4% (19/37) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`. The Windows Playwright coverage report matched exact ground truth after the fixes.
 
 - 2026-11-25 S4-T5 done. The checkout demo adds six controls, four tested, including the single-control wrapper and the renamed password field. The two-control wrapper remains untouched. Verify passed with 71 of 71 unit tests and calibration reporting `UI coverage 53.5% (23/43) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+- 2026-11-25 S4-T5 review follow-up. Hidden and ignored descendants leave wrapper credit intact. Renames preserve each field's interaction history and keep synthetic form and textbox values out of coverage, including during type changes and when another control references the textbox. Verify passed with 72 of 72 unit tests and calibration reporting `UI coverage 53.3% (24/45) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

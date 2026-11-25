@@ -147,6 +147,13 @@ const tests: DemoTest[] = [
       await page.getByRole('button', { name: 'Edit', exact: true }).click({ timeout: 2000 });
       await eventually(async () => (await textOf(page, '#selection')) === 'Editing options', 'editing options');
       await page.getByLabel('Password').fill('ProoflineCheckoutValueMarker', { timeout: 2000 });
+      await page.locator('#checkout-password').evaluate(async (input: HTMLInputElement) => {
+        input.type = 'submit';
+        await new Promise((resolve) => setTimeout(resolve, 350));
+        input.type = 'password';
+      });
+      await page.getByRole('textbox', { name: 'Draft note' }).fill('ProoflineCheckoutNoteMarker', { timeout: 2000 });
+      await page.getByRole('textbox', { name: 'Order note' }).waitFor({ timeout: 2000 });
     },
   },
   // demo/tests/menu.spec.ts: modal menu and disclosure triggers receive pointerdown without a click
