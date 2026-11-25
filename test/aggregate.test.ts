@@ -300,6 +300,26 @@ test('per-test grouping counts distinct names even if a test sees more than one'
   assert.deepEqual(elements.map((e) => [e.key, e.seen]), [['link|per test|x', 3]]);
 });
 
+test('separate DOM positions remain separate when a test sees three siblings with one CSS path', () => {
+  const records = [visit('a', '/', ['Catalog', 'Checkout', 'Cart'].map((name, index) => ({
+    ...el('link', name), position: `0.1.${index}`,
+  })))];
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.deepEqual(elements.map((e) => e.name).sort(), ['Cart', 'Catalog', 'Checkout']);
+});
+
+test('different slots at the same reported path each get an independent per-test group', () => {
+  const records = ['a', 'b', 'c'].map((testId) => visit(testId, '/', [
+    { ...el('link', `Notes for ${testId}`), position: '0.1.0' },
+    { ...el('link', `Profile for ${testId}`), position: '0.1.1' },
+  ], [`link|Notes for ${testId}|`]));
+  const { elements } = aggregateCoverage(records).views[0]!;
+  assert.deepEqual(elements.map((el) => [el.key, el.seen, el.tested]), [
+    ['link|per test|x|0.1.1', 3, false],
+    ['link|per test|x|0.1.0', 3, true],
+  ]);
+});
+
 test('a label also seen on a disabled element stays separate', () => {
   const records = ['Asha', 'Ben', 'Chen'].map((name) => visit(name, '/', [el('link', name)]));
   records.push(visit('busy', '/', [{ ...off('link', 'Asha'), key: 'link|Asha|other' }]));

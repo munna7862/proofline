@@ -324,6 +324,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
       const username = escapeHtml(url.searchParams.get('user') ?? 'guest');
       return res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>User links</title></head><body>
 <nav id="user-links"><a href="/about" onclick="event.preventDefault()">${username}'s notes</a><a href="/">Back to shop</a></nav>
+${username === 'asha_rao' ? '<nav id="shop-links"><a href="/about">Catalog archive</a><a href="/returns">Store policies</a><a href="/cart">Cart help</a></nav>' : ''}
 </body></html>`);
     }
     if (url.pathname === '/tips') return res.end(TIPS_PAGE);

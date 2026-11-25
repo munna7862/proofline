@@ -161,7 +161,7 @@ export function groupListItems(els: ElementCoverage[]): ElementCoverage[] {
   return rest.sort((a, b) => a.key.localeCompare(b.key));
 }
 
-const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path].join('\0');
+const elementLocation = (el: ElementInfo) => [el.role, el.tag, el.path, el.position ?? ''].join('\0');
 const PER_TEST_MIN_NAMES = 3;
 
 interface NameObservations {
@@ -195,13 +195,14 @@ function groupPerTestNames(
       rest.push(...members);
       continue;
     }
-    const { role, tag, path, href } = variants[0]!;
+    const { role, tag, path, position, href } = variants[0]!;
     const sharedHref = href && variants.every((el) => el.href === href);
     rest.push(...members.filter((el) => !singleTest(el)), {
-      key: `${role}|per test|${path}`,
+      key: `${role}|per test|${path}${position ? `|${position}` : ''}`,
       role,
       tag,
       path,
+      ...(position ? { position } : {}),
       name: `per test (${singleTestNames} seen)`,
       seen: singleTestNames,
       ...(sharedHref ? { href } : {}),

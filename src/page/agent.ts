@@ -306,6 +306,34 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
 
+  // The display path deliberately omits sibling positions. Record them separately
+  // so distinct controls with identical markup do not look like renamed versions
+  // of each other. Cache within one scan or interaction, while the DOM is unchanged.
+  const positionsInSnapshot = () => {
+    const positions = new WeakMap<Element, string>();
+    const indexes = new WeakMap<Element, number>();
+    return (el: Element): string => {
+      let ancestor: Element | null = el;
+      const unvisited: Element[] = [];
+      while (ancestor && !positions.has(ancestor)) {
+        unvisited.push(ancestor);
+        ancestor = ancestor.parentElement;
+      }
+      let prefix = ancestor ? `${positions.get(ancestor)}.` : '';
+      while (unvisited.length) {
+        const node = unvisited.pop()!;
+        const parent = node.parentElement;
+        if (parent && !indexes.has(node)) {
+          Array.from(parent.children).forEach((child, index) => indexes.set(child, index));
+        }
+        const position = `${prefix}${indexes.get(node) ?? 0}`;
+        positions.set(node, position);
+        prefix = `${position}.`;
+      }
+      return positions.get(el)!;
+    };
+  };
+
   const describe = (el: Element) => {
     const role = roleOf(el);
     const name = nameOf(el);
@@ -347,7 +375,7 @@ export function proofAgent(opts: AgentOptions): void {
   const fields = new WeakMap<Element, { id: string; views: Map<string, FieldState> }>();
   let nextField = 0;
 
-  const observe = (el: Element, view: string) => {
+  const observe = (el: Element, view: string, positionOf: (el: Element) => string) => {
     const element = describe(el);
     const enabled = !element.disabled;
     const nativeField = (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') && isField(el);
@@ -362,7 +390,7 @@ export function proofAgent(opts: AgentOptions): void {
       const previous = field.views.get(view);
       field.views.set(view, { key: element.key, enabled: enabled || !!previous?.enabled });
       if (previous && previous.key !== element.key) {
-        emit({ type: 'rename', view, nodeId: field.id, element });
+        emit({ type: 'rename', view, nodeId: field.id, element: { ...element, position: positionOf(el) } });
         return { element, nodeId: field.id, fresh: false };
       }
       return { element, nodeId: field.id, fresh: !previous || (!previous.enabled && enabled) };
@@ -404,14 +432,15 @@ export function proofAgent(opts: AgentOptions): void {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
     document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     const view = viewOf(location.href);
+    const positionOf = positionsInSnapshot();
     const fresh: any[] = [];
     const holding = !final && Date.now() - changedAt < HOLD_MS;
     document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
       if (isIgnored(el)) return;
       if (!isVisible(el)) return;
-      const entry = observe(el, view);
-      if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId });
+      const entry = observe(el, view, positionOf);
+      if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId, position: positionOf(el) });
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
   };
@@ -430,13 +459,13 @@ export function proofAgent(opts: AgentOptions): void {
     (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
     ((ev.target as HTMLInputElement).type || '').toLowerCase() === 'file';
 
-  const credit = (el: Element, view: string, event: string) => {
+  const credit = (el: Element, view: string, event: string, positionOf: (el: Element) => string) => {
     // The element the test just used is live in this view (even one held after a route change):
     // record it now, before the test can navigate away ahead of the next scan, so every
     // interaction has an inventory entry.
     carried.delete(el);
-    const { element, nodeId, fresh } = observe(el, view);
-    if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId }] });
+    const { element, nodeId, fresh } = observe(el, view, positionOf);
+    if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId, position: positionOf(el) }] });
     emit({ type: 'interaction', view, key: element.key, nodeId, event });
   };
 
@@ -452,7 +481,8 @@ export function proofAgent(opts: AgentOptions): void {
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
     if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
     const view = viewOf(location.href);
-    credit(el, view, ev.type);
+    const positionOf = positionsInSnapshot();
+    credit(el, view, ev.type, positionOf);
     if (ev.isTrusted) {
       const wrapper = el.parentElement?.closest(opts.interactiveSelector);
       if (wrapper && (roleOf(wrapper) === 'link' || roleOf(wrapper) === 'button') &&
@@ -460,7 +490,7 @@ export function proofAgent(opts: AgentOptions): void {
           !Array.from(wrapper.querySelectorAll(opts.interactiveSelector)).some(
             (descendant) => descendant !== el && !isIgnored(descendant) && isVisible(descendant),
           )) {
-        credit(wrapper, view, ev.type);
+        credit(wrapper, view, ev.type, positionOf);
       }
     }
     scheduleScan();
