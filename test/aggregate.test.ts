@@ -57,6 +57,25 @@ test('two values are not enough to learn a :param', () => {
   assert.deepEqual(s.views.map((v) => v.view).sort(), ['/users/asha_rao', '/users/ben_okafor']);
 });
 
+test('identical labels in separate shadow roots retain independent interaction credit', () => {
+  const apply = (scope: string) => ({
+    ...el('button', 'Apply'),
+    tag: 'button',
+    key: `button|Apply||shadow:${scope}@self`,
+    path: `${scope} > #shadow-root > button`,
+    position: `${scope}@self/button:0`,
+  });
+  const preferences = apply('x-panel#preferences');
+  const backup = apply('x-panel#backup');
+  const summary = aggregateCoverage([visit('a', '/components', [preferences, backup], [preferences.key])]);
+  assert.equal(summary.tested, 1);
+  assert.equal(summary.total, 2);
+  assert.deepEqual(summary.views[0]!.elements.map(({ key, tested }) => [key, tested]), [
+    [backup.key, false],
+    [preferences.key, true],
+  ]);
+});
+
 test('pages linked from a shared menu keep their own views', () => {
   const nav = [el('link', 'Intro', '/docs/intro'), el('link', 'API', '/docs/api'), el('link', 'FAQ', '/docs/faq')];
   const s = aggregateCoverage([visit('a', '/docs/intro', nav), visit('b', '/docs/api', nav), visit('c', '/docs/faq', nav)]);

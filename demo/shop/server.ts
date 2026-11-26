@@ -150,6 +150,39 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', render);
 </script>`;
 
+const SHADOW_PAGE = `<!doctype html><title>Preferences components</title>
+<span id="setting-label">Light DOM label</span>
+<button id="open-security">Open security</button>
+<button id="lock-draft">Lock backup</button>
+<x-panel id="preferences"><span slot="apply-label">Apply</span></x-panel>
+<x-panel id="backup"><template shadowrootmode="open">
+  <button>Apply</button>
+  <div id="draft" role="textbox" contenteditable="true" aria-label="Backup note" style="min-height:1em"></div>
+</template></x-panel>
+<x-panel id="closed"></x-panel>
+<x-panel id="notifications" aria-live="polite"></x-panel>
+<script>
+const panel = document.querySelector('#preferences').attachShadow({ mode: 'open' });
+panel.innerHTML = '<span id="setting-label">Preference name</span><input aria-labelledby="setting-label">' +
+  '<button id="apply-main"><slot name="apply-label"></slot></button><button>Reset</button><p id="outcome"></p><div id="security"></div>';
+panel.querySelector('#apply-main').addEventListener('click', () => {
+  panel.querySelector('#outcome').textContent = 'Preferences applied';
+});
+document.querySelector('#open-security').addEventListener('click', () => {
+  const host = panel.querySelector('#security');
+  if (!host.shadowRoot) host.attachShadow({ mode: 'open' }).innerHTML =
+    '<label>Proof document <input type="file"></label><button>Apply</button>';
+});
+document.querySelector('#lock-draft').addEventListener('click', () => {
+  const draft = document.querySelector('#backup').shadowRoot.querySelector('#draft');
+  draft.contentEditable = 'false';
+  draft.setAttribute('role', 'button');
+  draft.removeAttribute('aria-label');
+});
+document.querySelector('#closed').attachShadow({ mode: 'closed' }).innerHTML = '<button>ProoflineClosedShadowMarker</button>';
+document.querySelector('#notifications').attachShadow({ mode: 'open' }).innerHTML = '<button>ProoflineIgnoredShadowMarker</button>';
+</script>`;
+
 // Per-user page: each test visits its own user, like suites that create a fresh user per test.
 const profilePage = (username: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Profile</title></head><body>
@@ -461,6 +494,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/embedded/preview') return res.end(FRAME_HISTORY_PAGE);
     if (url.pathname === '/embedded/controls') return res.end(EMBEDDED_CONTROLS);
     if (url.pathname === '/embedded/foreign') return res.end('<!doctype html><button>ProoflineForeignFrameMarker</button>');
+    if (url.pathname === '/components') return res.end(SHADOW_PAGE);
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {

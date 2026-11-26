@@ -1,7 +1,7 @@
 {
   "_comment": "Ground truth for the demo shop. scripts/calibrate.ts fails if the engine disagrees.",
   "coverage": {
-    "counts": {"tests": 22, "neverEnabled": 2},
+    "counts": {"tests": 23, "neverEnabled": 2},
     "untested": ["link|About us|", "link|Returns policy|", "link|Cart (#)|cart-link", "textbox|Email|", "button|Subscribe|"],
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
@@ -13,9 +13,20 @@
     "/flow/done", "/flow/end", "/flow/auto", "/flow/auto-preview", "/flow/auto-complete", "/bootstrap/ready", "/help",
     "/help/faq", "/community", "/tips", "/embedded", "/embedded/controls", "/embedded/controls#frame-1", "/embedded#frame-2",
     "/embedded#frame-3", "/embedded#frame-3.1", "/embedded#frame-4", "/embedded#frame-4.1", "/embedded#frame-7",
-    "/embedded#frame-8", "/embedded#frame-9", "/embedded/preview", "/embedded/preview#frame-1", "/embedded/settings#frame-1"
+    "/embedded#frame-8", "/embedded#frame-9", "/embedded/preview", "/embedded/preview#frame-1", "/embedded/settings#frame-1",
+    "/components"
   ],
   "elements": {
+    "/components": [
+      "button|Open security|", "button|Lock backup|",
+      "textbox|Preference name||shadow:x-panel#preferences@self",
+      "button|Apply||shadow:x-panel#preferences@self",
+      "button|Reset||shadow:x-panel#preferences@self",
+      "textbox|Proof document||shadow:x-panel#preferences@self / div#security@self",
+      "button|Apply||shadow:x-panel#preferences@self / div#security@self",
+      "button|Apply||shadow:x-panel#backup@self",
+      "button|draft||shadow:x-panel#backup@self"
+    ],
     "/": ["button|Add to cart|", "button|Subscribe|", "link|About us|", "link|Cart (#)|cart-link", "link|Returns policy|", "textbox|Email|", "textbox|Search|"],
     "/users/:param": ["button|Follow|", "link|Back to shop|"],
     "/users/:param/notes": ["link|Back to shop|"],
@@ -54,6 +65,13 @@
     "/tips": ["link|Back to shop|"]
   },
   "testedIn": {
+    "/components": [
+      "button|Open security|", "button|Lock backup|",
+      "textbox|Preference name||shadow:x-panel#preferences@self",
+      "button|Apply||shadow:x-panel#preferences@self",
+      "textbox|Proof document||shadow:x-panel#preferences@self / div#security@self",
+      "button|draft||shadow:x-panel#backup@self"
+    ],
     "/": ["button|Add to cart|", "textbox|Search|"],
     "/users/:param": ["button|Follow|"],
     "/users/:param/notes": [],
@@ -91,7 +109,15 @@
     "/community": ["button|Join community|", "link|in list|ul#posts > li > a"],
     "/tips": []
   },
-  "privateMarkers": ["ProoflineEditorMarker", "ProoflinePlainEditorMarker", "ProoflineRouteMarker", "ProoflineLinkMarker", "ProoflineDraftLinkPathMarker", "ProoflineDraftLinkTextMarker", "ProoflineCheckoutValueMarker", "ProoflineCheckoutNoteMarker", "ProoflineCustomFieldMarker", "ProoflineFastViewDraftMarker", "ProoflineFastViewInputMarker", "ProoflineFastViewRoleMarker", "ProoflineBootstrapDraftMarker", "ProoflineFrameInputMarker", "ProoflineForeignFrameMarker", "http://localhost:4173/:uuid"],
+  "privateMarkers": [
+    "ProoflineEditorMarker", "ProoflinePlainEditorMarker", "ProoflineRouteMarker", "ProoflineLinkMarker",
+    "ProoflineDraftLinkPathMarker", "ProoflineDraftLinkTextMarker", "ProoflineCheckoutValueMarker",
+    "ProoflineCheckoutNoteMarker", "ProoflineCustomFieldMarker", "ProoflineFastViewDraftMarker",
+    "ProoflineFastViewInputMarker", "ProoflineFastViewRoleMarker", "ProoflineBootstrapDraftMarker",
+    "ProoflineFrameInputMarker", "ProoflineForeignFrameMarker", "http://localhost:4173/:uuid",
+    "ProoflineShadowInputMarker", "ProoflineShadowDraftMarker", "ProoflineShadowFilenameMarker",
+    "ProoflineClosedShadowMarker", "ProoflineIgnoredShadowMarker"
+  ],
   "paths": {"/help/faq": {"button|Was this helpful?|": "form#feedback > button.helpful"}},
   "seen": {"/community": {"link|in list|ul#posts > li > a": 5}, "/users/links": {"link|per test|nav#user-links > a": 3}},
   "neverEnabled": ["button|Processing...|", "button|Disabled menu|"],

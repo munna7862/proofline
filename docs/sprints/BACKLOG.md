@@ -12,7 +12,7 @@ Planned in [SPRINT_04.md](SPRINT_04.md): focus guards, per-run names, pointer-do
 
 ## Sprint 5: Phase 1 close-out (week 5)
 - [x] Same-origin iframes in the agent, with demo pages and ground truth
-- [ ] Open shadow roots in the agent, with demo pages and ground truth
+- [x] Open shadow roots in the agent, with demo pages and ground truth
 - `proofline.config.json` (ignoreViews, ignoreElements, viewRules) + default infra endpoint excludes (`/socket.io`, suite `/api/test/*` backdoors)
 - `proofline merge` for CI shards
 - S3-6 views with inventory but no visitors
