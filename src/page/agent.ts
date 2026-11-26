@@ -89,6 +89,19 @@ export const INTERACTIVE_SELECTOR = [
 ].join(',');
 
 export function proofAgent(opts: AgentOptions): void {
+  // Access to frameElement requires the embedding document to share this frame's origin.
+  // Check the entire chain, including sandboxed frames and nested cross-origin boundaries.
+  const frameChain: Element[] = [];
+  try {
+    for (let embed: Window = window; embed !== embed.parent; embed = embed.parent) {
+      const frame = embed.frameElement;
+      if (!frame) return;
+      frameChain.push(frame);
+    }
+  } catch {
+    return;
+  }
+
   const w = window as any;
   if (w.__prooflineInstalled) return;
   w.__prooflineInstalled = true;
@@ -143,6 +156,87 @@ export function proofAgent(opts: AgentOptions): void {
     } catch {
       return '/';
     }
+  };
+  const frameStateKey = Symbol.for('proofline.frameState');
+  type FrameSlots = { numbers: WeakMap<Element, number>; holders: Map<number, WeakRef<Element>> };
+  type FrameState = {
+    byView: Map<string, FrameSlots>;
+    embeddingViews: WeakMap<Element, string>;
+    inlineView?: string;
+    rewrittenRoute?: { href: string; view: string };
+  };
+  const frameState = (doc: Document): FrameState => {
+    const owner = doc as Document & { [frameStateKey]?: FrameState };
+    return owner[frameStateKey] ??= { byView: new Map(), embeddingViews: new WeakMap() };
+  };
+  const slotOf = (frame: Element, owner: FrameState, view: string, slots: FrameSlots) => {
+    const doc = frame.ownerDocument;
+    const numberOf = (node: Element) => {
+      const number = slots.numbers.get(node);
+      return number !== undefined && slots.holders.get(number)?.deref() === node ? number : undefined;
+    };
+    let next = 1;
+    const reserve = (node: Element) => {
+      // An exiting frame can stay mounted while the next view renders.
+      const loadedUnder = owner.embeddingViews.get(node);
+      if (loadedUnder !== undefined && loadedUnder !== view) return;
+      owner.embeddingViews.set(node, view);
+      if (numberOf(node) !== undefined) return;
+      while (true) {
+        const holder = slots.holders.get(next)?.deref();
+        if (!holder?.isConnected || holder.ownerDocument !== doc || owner.embeddingViews.get(holder) !== view) break;
+        next++;
+      }
+      slots.numbers.set(node, next);
+      slots.holders.set(next++, new WeakRef(node));
+    };
+    if (numberOf(frame) === undefined) {
+      // Keep connected siblings in their existing slots. Visiting a route again
+      // can reuse vacated positions, while live siblings keep distinct views.
+      doc.querySelectorAll('iframe,frame').forEach(reserve);
+      const root = frame.getRootNode() as Document | ShadowRoot;
+      if (root !== doc) root.querySelectorAll('iframe,frame').forEach(reserve);
+      reserve(frame);
+    }
+    return slots.numbers.get(frame)!;
+  };
+  // Blank, srcdoc and blob documents have no application route of their own.
+  const isInlineFrameUrl = (href: string) => /^(?:blob:|about:(?:blank|srcdoc)(?:[?#]|$))/.test(href);
+  const inlineFrameView = (() => {
+    const frame = frameChain[0];
+    if (!frame) return;
+    const doc = frame.ownerDocument;
+    const owner = frameState(doc);
+    const rewrite = owner.rewrittenRoute;
+    const parentView = owner.inlineView ?? (rewrite?.href === doc.URL ? rewrite.view : viewOf(doc.URL));
+    owner.embeddingViews.set(frame, parentView);
+    if (!isInlineFrameUrl(location.href)) return;
+    let slots = owner.byView.get(parentView);
+    if (!slots) {
+      slots = { numbers: new WeakMap(), holders: new Map() };
+      owner.byView.set(parentView, slots);
+    }
+    const slot = slotOf(frame, owner, parentView, slots);
+    const view = owner.inlineView ? `${parentView}.${slot}` : `${parentView}#frame-${slot}`;
+    frameState(document).inlineView = view;
+    return view;
+  })();
+  const currentViewOf = () => inlineFrameView ?? viewOf(location.href);
+  const routedFrameState = frameChain.length && !inlineFrameView ? frameState(document) : undefined;
+  let lastFrameView = routedFrameState ? currentViewOf() : undefined;
+  const observedView = () => {
+    if (!routedFrameState) return currentViewOf();
+    const rewrite = routedFrameState.rewrittenRoute;
+    if (rewrite?.href === location.href) return rewrite.view;
+    if (rewrite) delete routedFrameState.rewrittenRoute;
+    lastFrameView = currentViewOf();
+    return lastFrameView;
+  };
+  const visitedFrameViews = new Set<string>();
+  const visitFrameView = (view: string) => {
+    if (!frameChain.length || visitedFrameViews.has(view)) return;
+    visitedFrameViews.add(view);
+    emit({ type: 'view', view });
   };
   const clean = (s: string | null | undefined) =>
     (s || '').replace(/\s+/g, ' ').trim().replace(/\d+/g, '#').slice(0, 80);
@@ -369,7 +463,8 @@ export function proofAgent(opts: AgentOptions): void {
     const role = roleOf(el);
     const name = nameOf(el);
     const testId = testIdOf(el);
-    const href = el.tagName === 'A' && !isDraftContent(el) ? viewOf((el as HTMLAnchorElement).href) : undefined;
+    const destination = el.tagName === 'A' && !isDraftContent(el) ? (el as HTMLAnchorElement).href : undefined;
+    const href = destination === undefined || destination.startsWith('blob:') ? undefined : viewOf(destination);
     const list = listOf(el);
     return {
       key: [role, name, testId || ''].join('|'),
@@ -399,6 +494,19 @@ export function proofAgent(opts: AgentOptions): void {
       return false;
     }
   };
+
+  const frameParent = (el: Element) =>
+    el.assignedSlot ?? el.parentElement ?? (el.getRootNode() as ShadowRoot).host ?? null;
+  const inVisibleFrame = () => frameChain.every((frame) => {
+    if (!frame.isConnected || !frame.clientWidth || !frame.clientHeight) return false;
+    for (let ancestor: Element | null = frame; ancestor; ancestor = frameParent(ancestor)) {
+      if (ancestor.matches('[hidden],[aria-hidden="true"]') || isIgnored(ancestor)) return false;
+    }
+    if (typeof frame.checkVisibility === 'function') {
+      return frame.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+    }
+    return isVisible(frame) && frame.ownerDocument.defaultView?.getComputedStyle(frame).visibility === 'visible';
+  });
 
   type Seen = { enabled: boolean; location: string | null };
   const seenPerView: Record<string, Record<string, Seen>> = {};
@@ -464,6 +572,16 @@ export function proofAgent(opts: AgentOptions): void {
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
   const onDomChanges = (changes: MutationRecord[]) => {
+    // document.open() can replace a frame's content and clear its event listeners.
+    if (frameChain.length && changes.some(({ target }) => target === document)) {
+      const href = location.href;
+      // An ancestor opening this document can copy its own URL into the frame
+      // without navigation. Preserve the frame's route while that URL persists.
+      if (routedFrameState && lastFrameView && frameChain.some((frame) => frame.ownerDocument.URL === href)) {
+        routedFrameState.rewrittenRoute = { href, view: lastFrameView };
+      }
+      listenForInteractions();
+    }
     for (const change of changes) {
       const target = change.target as Element;
       const previous = change.oldValue?.toLowerCase();
@@ -481,7 +599,7 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const visibleShell = (node: Element) => {
-    if (!node.isConnected || isIgnored(node) || node.closest('[hidden],[aria-hidden="true"]')) return null;
+    if (!node.isConnected || isIgnored(node) || node.closest('[hidden],[aria-hidden="true"]') || !inVisibleFrame()) return null;
     const landmark = node.closest(SHELL_SELECTOR);
     if (!landmark) return null;
     if (typeof node.checkVisibility === 'function') {
@@ -525,8 +643,11 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const onUrlChange = (departure?: Departure) => {
-    const view = viewOf(location.href);
-    emit({ type: 'view', view });
+    if (routedFrameState) delete routedFrameState.rewrittenRoute;
+    const view = currentViewOf();
+    if (routedFrameState) lastFrameView = view;
+    if (!frameChain.length) emit({ type: 'view', view });
+    else if (inVisibleFrame()) visitFrameView(view);
     if (view !== currentView) {
       pendingDeparture = departure;
       currentView = view;
@@ -554,7 +675,9 @@ export function proofAgent(opts: AgentOptions): void {
   const scan = (final = false) => {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
     document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
-    const view = viewOf(location.href);
+    if (!inVisibleFrame()) return;
+    const view = observedView();
+    visitFrameView(view);
     const positionOf = positionsInSnapshot();
     const fresh: any[] = [];
     const settled = Date.now() - changedAt >= HOLD_MS;
@@ -580,6 +703,38 @@ export function proofAgent(opts: AgentOptions): void {
     }, 250);
   };
 
+  // A frame can become visible due to embedding attributes or CSS layout.
+  // Observe the frame and its ancestors until its document navigates away.
+  const embeddingObserver = frameChain.length ? new MutationObserver(scheduleScan) : undefined;
+  const frameResize = frameChain.length && typeof ResizeObserver === 'function' ? new ResizeObserver(scheduleScan) : undefined;
+  const embeddingDocuments = new Set(frameChain.map((frame) => frame.ownerDocument));
+  const watchEmbedding = () => {
+    if (!embeddingObserver) return;
+    for (const doc of embeddingDocuments) {
+      // CSS can reveal a frame after a form change without altering its size.
+      doc.addEventListener('change', scheduleScan, true);
+      doc.defaultView?.addEventListener('resize', scheduleScan);
+    }
+    for (const frame of frameChain) {
+      frameResize?.observe(frame);
+      for (let ancestor: Element | null = frame; ancestor; ancestor = frameParent(ancestor)) {
+        embeddingObserver.observe(ancestor, {
+          attributes: true,
+          attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'height', 'width', 'open'],
+        });
+      }
+    }
+    scheduleScan();
+  };
+  const unwatchEmbedding = () => {
+    embeddingObserver?.disconnect();
+    frameResize?.disconnect();
+    for (const doc of embeddingDocuments) {
+      doc.removeEventListener('change', scheduleScan, true);
+      doc.defaultView?.removeEventListener('resize', scheduleScan);
+    }
+  };
+
   const isFileFill = (ev: Event) =>
     (ev.type === 'input' || ev.type === 'change') &&
     (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
@@ -600,13 +755,15 @@ export function proofAgent(opts: AgentOptions): void {
 
   const onEvent = (ev: Event) => {
     if (!ev.isTrusted && !isFileFill(ev)) return;
+    if (!inVisibleFrame()) return;
     const target = ev.target as Element | null;
     if (!target || typeof (target as any).closest !== 'function') return;
     const el = target.closest(opts.interactiveSelector);
     if (!el || isIgnored(el)) return;
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
     if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
-    const view = viewOf(location.href);
+    const view = observedView();
+    visitFrameView(view);
     const positionOf = positionsInSnapshot();
     credit(el, view, ev.type, positionOf);
     if (ev.isTrusted) {
@@ -622,9 +779,18 @@ export function proofAgent(opts: AgentOptions): void {
     scheduleScan();
   };
 
-  ['click', 'dblclick', 'contextmenu', 'input', 'change', 'pointerdown'].forEach((t) =>
-    document.addEventListener(t, onEvent, true),
-  );
+  const onPopState = () => onUrlChange();
+  const listenForInteractions = () => {
+    for (const type of ['click', 'dblclick', 'contextmenu', 'input', 'change', 'pointerdown']) {
+      document.addEventListener(type, onEvent, true);
+    }
+    window.addEventListener('popstate', onPopState);
+    if (embeddingObserver) {
+      window.addEventListener('pagehide', unwatchEmbedding);
+      window.addEventListener('pageshow', watchEmbedding);
+    }
+  };
+  listenForInteractions();
 
   // Called by the collector when the test ends. If a route change is still on hold, wait it
   // out first (at most HOLD_MS) so the old view's leftovers can unmount; whatever is still on
@@ -643,11 +809,11 @@ export function proofAgent(opts: AgentOptions): void {
     });
 
   const start = () => {
-    currentView = viewOf(location.href);
-    emit({ type: 'view', view: currentView });
+    currentView = currentViewOf();
+    if (!frameChain.length) emit({ type: 'view', view: currentView });
     scan();
     documentObserver = new MutationObserver(onDomChanges);
-    documentObserver.observe(document.documentElement, {
+    documentObserver.observe(frameChain.length ? document : document.documentElement, {
       subtree: true,
       childList: true,
       characterData: true,
@@ -657,6 +823,7 @@ export function proofAgent(opts: AgentOptions): void {
         'id', 'name', 'type', 'for', 'role', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
         'data-testid', 'data-test', 'data-cy'],
     });
+    if (embeddingObserver) watchEmbedding();
   };
 
   // SPA navigations: report the new view and rescan.
@@ -676,7 +843,6 @@ export function proofAgent(opts: AgentOptions): void {
   };
   wrapHistory('pushState');
   wrapHistory('replaceState');
-  window.addEventListener('popstate', () => onUrlChange());
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();

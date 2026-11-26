@@ -10,9 +10,9 @@ function firstPathSegments(segments: string[]): Set<number> {
   return first;
 }
 
-// Keep the hash boundary separate so the final pathname segment can be learned too.
-const splitViewPath = (view: string) => view.replace('#/', '/#/').split('/');
-const restoreHashBoundary = (path: string) => path.replace('/#/', '#/');
+// Keep hash routes and inline frame suffixes separate from learnable path segments.
+const splitViewPath = (view: string) => view.replace('#/', '/#/').replace(/(#frame-[\d.]+)$/, '/$1').split('/');
+const restoreViewBoundaries = (path: string) => path.replace('/#/', '#/').replace(/\/(#frame-[\d.]+)$/, '$1');
 
 function canLearnSegment(segment: string, first: boolean): boolean {
   if (!segment || segment.startsWith(':') || segment.includes('#')) return false;
@@ -65,7 +65,7 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
     segments.forEach((segment, index) => {
       if (!canLearnSegment(segment, first.has(index))) return;
       const parent = segments.slice(0, index).join('/');
-      if (isSharedLink(restoreHashBoundary(`${parent}/${segment}`))) return;
+      if (isSharedLink(restoreViewBoundaries(`${parent}/${segment}`))) return;
       const pattern = JSON.stringify([parent, segments.slice(index + 1)]);
       const group = groups.get(pattern) ?? { parent, examples: new Map<string, string>() };
       group.examples.set(segment, [...tests][0]!);
@@ -89,11 +89,11 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
       const parent = segments.slice(0, index).join('/');
       const learnedValues = learnedParents.get(parent);
       if (!learnedValues) return segment;
-      const branch = restoreHashBoundary(`${parent}/${segment}`);
+      const branch = restoreViewBoundaries(`${parent}/${segment}`);
       const sharedBranch = isSharedLink(branch) || (visitors.get(branch)?.size ?? 0) >= 2;
       return sharedBranch && !learnedValues.has(segment) ? segment : ':param';
     }).join('/');
-    const mappedView = restoreHashBoundary(mapped);
+    const mappedView = restoreViewBoundaries(mapped);
     if (mappedView !== view) out.set(view, mappedView);
   }
   return out;

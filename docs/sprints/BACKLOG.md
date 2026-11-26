@@ -11,7 +11,8 @@ Decision D-1 option B approved 2026-10-04: Phase 1 exit moves to week 4, later s
 Planned in [SPRINT_04.md](SPRINT_04.md): focus guards, per-run names, pointer-down menus, learned `:param` rework, passing tests only, nested links and renamed fields, trial re-run, trial write-up for the leads. Founder approved 2026-10-05: Phase 1 exit moves to week 5, later sprints move one week.
 
 ## Sprint 5: Phase 1 close-out (week 5)
-- Open shadow roots and same-origin iframes in the agent, with demo pages + ground truth
+- [x] Same-origin iframes in the agent, with demo pages and ground truth
+- [ ] Open shadow roots in the agent, with demo pages and ground truth
 - `proofline.config.json` (ignoreViews, ignoreElements, viewRules) + default infra endpoint excludes (`/socket.io`, suite `/api/test/*` backdoors)
 - `proofline merge` for CI shards
 - S3-6 views with inventory but no visitors

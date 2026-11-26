@@ -76,6 +76,80 @@ const simplePage = (title: string) =>
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+const EMBEDDED_CONTROLS = `<!doctype html><button onclick="document.querySelector('p').textContent = 'Saved'">Save panel</button>
+<button>Reset panel</button><p>Unsaved</p>`;
+const INLINE_CONTROLS = '<label>Panel note <input></label><button>Clear note</button>';
+const BACKUP_CONTROLS = `${INLINE_CONTROLS}
+<iframe title="Review panel" srcdoc="${escapeHtml('<button>Review note</button>')}"></iframe>`;
+const embeddedPage = (port: number) => `<!doctype html><title>Embedded panels</title>
+<style>#compact-toggle:not(:checked) + #compact-panel { visibility: hidden }</style>
+<button>Close panels</button>
+<button id="update-saved">Update saved panel</button>
+<iframe title="Saved panel" src="/embedded/controls"></iframe>
+<iframe title="Note panel" srcdoc="${escapeHtml(INLINE_CONTROLS)}"></iframe>
+<iframe title="Backup panel" srcdoc="${escapeHtml(BACKUP_CONTROLS)}"></iframe>
+<iframe title="Written panel"></iframe>
+<iframe title="Hidden panel" hidden srcdoc="<button>Hidden action</button>"></iframe>
+<iframe title="Other origin" src="http://127.0.0.1:${port}/embedded/foreign"></iframe>
+<details id="status" style="display:inline-block"><summary role="button">Show status panel</summary>
+<iframe title="Status panel" srcdoc="<button>Clear status</button>"></iframe></details>
+<iframe title="Blob panel"></iframe>
+<label for="compact-toggle">Compact mode</label><input type="checkbox" id="compact-toggle">
+<iframe id="compact-panel" title="Compact panel" srcdoc="<button>Manage compact mode</button>"></iframe>
+<script>
+document.querySelector('#update-saved').addEventListener('click', () => {
+  const saved = document.querySelector('[title="Saved panel"]').contentDocument;
+  saved.open();
+  saved.write(${JSON.stringify(`<button onclick="this.disabled = true">Close panels</button>
+<iframe title="Saved options" srcdoc="${escapeHtml('<button>More saved options</button>')}"></iframe>`)});
+  saved.close();
+});
+const panel = document.querySelector('[title="Written panel"]').contentDocument;
+panel.open();
+panel.write(${JSON.stringify(`<button onclick="this.disabled = true">Confirm note</button>
+<iframe title="Written options" srcdoc="${escapeHtml('<button>Save preferences</button>')}"></iframe>`)});
+panel.close();
+const statusPanel = document.querySelector('#status');
+statusPanel.addEventListener('toggle', () => {
+  if (statusPanel.open) setTimeout(() => { statusPanel.open = false; }, 750);
+});
+const blobFrame = document.querySelector('[title="Blob panel"]');
+const activity = URL.createObjectURL(new Blob(['Activity'], { type: 'text/plain' }));
+blobFrame.src = URL.createObjectURL(new Blob([
+  '<button>Open activity</button><a download="activity.txt" href="' + activity + '">Download activity</a>'
+], { type: 'text/html' }));
+blobFrame.addEventListener('load', () => URL.revokeObjectURL(blobFrame.src), { once: true });
+window.addEventListener('pagehide', () => URL.revokeObjectURL(activity), { once: true });
+const compactToggle = document.querySelector('#compact-toggle');
+compactToggle.addEventListener('change', () => {
+  if (compactToggle.checked) setTimeout(() => { compactToggle.checked = false; }, 750);
+});
+</script>`;
+
+const SETTINGS_FRAME = '<iframe title="Frame settings" srcdoc="<button onclick=\'this.disabled = true\'>Save settings</button>"></iframe>';
+const FRAME_PREVIEW = `
+<button id="settings">Open settings</button>
+<iframe title="Preview" srcdoc="<button>Close preview</button>"></iframe>`;
+const FRAME_HISTORY_PAGE = `<!doctype html><title>Frame preview</title>${FRAME_PREVIEW}
+<script>
+const render = () => {
+  if (!location.pathname.endsWith('/settings')) {
+    document.body.innerHTML = ${JSON.stringify(FRAME_PREVIEW)};
+    return;
+  }
+  const preview = document.querySelector('[title="Preview"]');
+  document.querySelector('#settings')?.remove();
+  document.body.insertAdjacentHTML('beforeend', ${JSON.stringify(SETTINGS_FRAME)});
+  document.querySelector('[title="Frame settings"]').addEventListener('load', () => preview?.remove(), { once: true });
+};
+document.addEventListener('click', (event) => {
+  if (event.target.id !== 'settings') return;
+  history.pushState({}, '', '/embedded/settings');
+  render();
+});
+window.addEventListener('popstate', render);
+</script>`;
+
 // Per-user page: each test visits its own user, like suites that create a fresh user per test.
 const profilePage = (username: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Profile</title></head><body>
@@ -370,7 +444,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
       cart = [];
       return json(200, { ok: true });
     }
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+    res.setHeader('content-type', 'text/html; charset=utf-8');
     if (url.pathname === '/') return res.end(PAGE);
     if (url.pathname === '/cart') return res.end(simplePage('Your cart'));
     if (url.pathname === '/about') return res.end(simplePage('About us'));
@@ -382,6 +456,11 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/flow/start') return res.end(FLOW_PAGE);
     if (url.pathname === '/flow/auto') return res.end(AUTO_FLOW_PAGE);
     if (url.pathname === '/bootstrap/start') return res.end(BOOTSTRAP_PAGE);
+    if (url.pathname === '/embedded') return res.end(embeddedPage(port));
+    if (url.pathname === '/embedded/settings') return res.end(`<!doctype html><title>Frame settings</title>${SETTINGS_FRAME}`);
+    if (url.pathname === '/embedded/preview') return res.end(FRAME_HISTORY_PAGE);
+    if (url.pathname === '/embedded/controls') return res.end(EMBEDDED_CONTROLS);
+    if (url.pathname === '/embedded/foreign') return res.end('<!doctype html><button>ProoflineForeignFrameMarker</button>');
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {
