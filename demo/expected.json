@@ -6,6 +6,20 @@
     "tested": ["button|Add to cart|", "textbox|Search|", "button|Follow|", "button|Upload|", "textbox|avatar|", "button|Open FAQ|", "button|Was this helpful?|"]
   },
   "testsExcluded": 1,
+  "configuredCoverage": {
+    "options": {
+      "ignoreViews": ["/tips"],
+      "ignoreElements": ["button|Close panels|"],
+      "viewRules": [{"pattern": "^/help(?:/faq)?$", "name": "Help center"}]
+    },
+    "total": 117,
+    "tested": 47,
+    "excludedViews": ["/tips", "/help", "/help/faq"],
+    "groupedView": {
+      "name": "Help center",
+      "elements": ["button|Open FAQ|", "button|Was this helpful?|", "link|Help home|"]
+    }
+  },
   "reachedByUrl": ["link|Back to shop|"],
   "views": [
     "/", "/users/:param", "/users/:param/notes", "/users/:param/notes/new", "/users/links", "/notes/:id",

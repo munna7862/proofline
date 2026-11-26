@@ -99,16 +99,17 @@ export function learnViewParams(records: TestCoverageRecord[]): Map<string, stri
   return out;
 }
 
-/** Rewrites every view key (visited views, inventory, interactions, link hrefs) through the map. */
-function remapViews(rec: TestCoverageRecord, map: Map<string, string>): TestCoverageRecord {
-  if (map.size === 0) return rec;
-  const to = (v: string) => map.get(v) ?? v;
-  const inventory: TestCoverageRecord['inventory'] = {};
+/** Rewrites visited views, inventory, interactions, and link destinations. */
+function remapViews(rec: TestCoverageRecord, to: (view: string) => string): TestCoverageRecord {
+  const inventory: TestCoverageRecord['inventory'] = Object.create(null);
   for (const [view, els] of Object.entries(rec.inventory)) {
-    const mapped = els.map((el) => (el.href && map.has(el.href) ? { ...el, href: to(el.href) } : el));
+    const mapped = els.map((el) => {
+      const href = el.href ? to(el.href) : el.href;
+      return href === el.href ? el : { ...el, href };
+    });
     inventory[to(view)] = [...(inventory[to(view)] ?? []), ...mapped];
   }
-  const interactions: TestCoverageRecord['interactions'] = {};
+  const interactions: TestCoverageRecord['interactions'] = Object.create(null);
   for (const [view, keys] of Object.entries(rec.interactions)) {
     interactions[to(view)] = [...new Set([...(interactions[to(view)] ?? []), ...keys])];
   }
@@ -230,6 +231,8 @@ export interface AggregateOptions {
   ignoreViews?: string[];
   /** Element keys (role|name|testid) or substrings to ignore, e.g. ['link|Privacy policy|'] */
   ignoreElements?: string[];
+  /** Match normalized view keys in order. The first matching rule names the view. */
+  viewRules?: { pattern: string; name: string }[];
 }
 
 /**
@@ -252,7 +255,9 @@ export function aggregateCoverage(all: TestCoverageRecord[], opts: AggregateOpti
   // so its partial coverage is not a stable fact about the suite (same rule as the fault check).
   const input = all.filter(countsTowardCoverage);
   const learned = learnViewParams(input);
-  const records = input.map((rec) => remapViews(rec, learned));
+  const rules = opts.viewRules?.map(({ pattern, name }) => ({ pattern: new RegExp(pattern), name })) ?? [];
+  const viewOf = (view: string) => rules.find(({ pattern }) => pattern.test(view))?.name ?? learned.get(view) ?? view;
+  const records = learned.size || rules.length ? input.map((rec) => remapViews(rec, viewOf)) : input;
   const ignoreViews = new Set(opts.ignoreViews ?? []);
   const ignored = (key: string) => (opts.ignoreElements ?? []).some((p) => key.includes(p));
 

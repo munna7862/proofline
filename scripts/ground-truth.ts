@@ -22,6 +22,13 @@ export interface GroundTruth {
   elements: Record<string, string[]>;
   /** Exact tested element keys per view. */
   testedIn: Record<string, string[]>;
+  configuredCoverage?: {
+    options: unknown;
+    total: number;
+    tested: number;
+    excludedViews: string[];
+    groupedView: { name: string; elements: string[] };
+  };
   /** Synthetic field values and URL parameters that may never appear in artifacts. */
   privateMarkers?: string[];
   /** Exact element path per view and key (paths are for humans; they must read right). */

@@ -70,6 +70,24 @@ Coverage reports group three or more different labels at the same control locati
 
 When Proofline learns a per-test URL parameter, views such as `/users/:param` and `/users/:param/notes` use the same parameter position. Top-level paths such as `/help` and `/tips` keep their names.
 
+### Optional coverage settings
+
+The Playwright reporter and `npx proofline report` read `proofline.config.json` from the working directory.
+
+```json
+{
+  "ignoreViews": ["/internal/status"],
+  "ignoreElements": ["link|Privacy policy|"],
+  "viewRules": [
+    { "pattern": "^/help(?:/faq)?$", "name": "Help center" }
+  ]
+}
+```
+
+- `viewRules` match normalized view paths in file order. The first match names the report view and takes precedence over learned parameters. Views and link destinations with the same resulting name are grouped.
+- `ignoreViews` drop exact view names after grouping. `ignoreElements` drop controls whose coverage keys contain one of the listed strings.
+- Arrays passed directly to the Playwright reporter take precedence over the corresponding file settings. Run `npx proofline report` to apply file changes to existing raw coverage.
+
 ## Develop
 
 ```bash
