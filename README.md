@@ -11,14 +11,14 @@ Everything runs locally. Nothing is sent anywhere.
 
 Coverage uses labels and field metadata for contenteditable controls, keeps draft text private when an editor becomes read-only, and omits destinations of links inside draft content. View URLs omit query parameters, including in hash routes. If you generated a coverage report with an older build, rerun your Playwright tests to regenerate its raw records and report before sharing.
 
-Visible same-origin frames contribute UI coverage. URL-backed frames use their own view paths, and inline frames appear under the embedding path with a suffix such as `#frame-2`. Cross-origin and opaque sandboxed frames are outside UI coverage.
+Visible same-origin frames contribute UI coverage. URL-backed frames use their own view paths. Inline frames use the embedding path at load and a positional suffix such as `#frame-2`. Cross-origin and opaque sandboxed frames are outside UI coverage.
 
 ## Status
 
 Version `0.1.0`, pre-release. **Not published to npm yet** (the unscoped name `proofline` on npm belongs to an unrelated package; install from source as shown below).
 
 - Phase 0 (foundations) is done: the engine runs end to end in the real Playwright runner and matches the ground truth in `demo/expected.json` in CI.
-- Phase 1 (UI coverage on real suites) is in progress, in Sprint 4. Trials run against two real suites: [buggy-books](https://github.com/munna7862/buggy-books) and epic-stack.
+- Phase 1 (UI coverage on real suites) is in progress, in Sprint 5. Trials run against two real suites: [buggy-books](https://github.com/munna7862/buggy-books) and epic-stack.
 - Later phases (npm release, VS Code extension, paid tier) are planned. `vscode-extension/` is a skeleton and has not been run.
 
 `docs/STATUS.md` logs every verified task and its result. The roadmap is in `docs/MASTER_PLAN.md`.

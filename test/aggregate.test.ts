@@ -135,6 +135,21 @@ test('generated-looking first segments learn and propagate while ordinary first 
   ]));
 });
 
+test('inline frame views keep their positions when the enclosing path learns a parameter', () => {
+  const records = ['asha', 'ben', 'chen'].flatMap((user) => [
+    visit(user, `/users/${user}#frame-1`),
+    visit(user, `/users/${user}#frame-2`),
+    visit(user, `/app#/users/${user}#frame-2.1`),
+  ]);
+  const summary = aggregateCoverage(records);
+  assert.deepEqual(summary.views.map(({ view }) => view).sort(), [
+    '/app#/users/:param#frame-2.1',
+    '/users/:param#frame-1',
+    '/users/:param#frame-2',
+  ]);
+  assert.equal(summary.total, 3);
+});
+
 test('learning from nested views reaches user home pages and descendants with sparse evidence', () => {
   const records = [
     visit('a', '/users/asha/notes/:id'),

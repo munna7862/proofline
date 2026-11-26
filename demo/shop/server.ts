@@ -79,13 +79,37 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 const EMBEDDED_CONTROLS = `<!doctype html><button onclick="document.querySelector('p').textContent = 'Saved'">Save panel</button>
 <button>Reset panel</button><p>Unsaved</p>`;
 const INLINE_CONTROLS = '<label>Panel note <input></label><button>Clear note</button>';
+const BACKUP_CONTROLS = `${INLINE_CONTROLS}
+<iframe title="Review panel" srcdoc="${escapeHtml('<button>Review note</button>')}"></iframe>`;
 const embeddedPage = (port: number) => `<!doctype html><title>Embedded panels</title>
 <button>Close panels</button>
 <iframe title="Saved panel" src="/embedded/controls"></iframe>
 <iframe title="Note panel" srcdoc="${escapeHtml(INLINE_CONTROLS)}"></iframe>
-<iframe title="Backup panel" srcdoc="${escapeHtml(INLINE_CONTROLS)}"></iframe>
+<iframe title="Backup panel" srcdoc="${escapeHtml(BACKUP_CONTROLS)}"></iframe>
+<iframe title="Written panel"></iframe>
 <iframe title="Hidden panel" hidden srcdoc="<button>Hidden action</button>"></iframe>
-<iframe title="Other origin" src="http://127.0.0.1:${port}/embedded/foreign"></iframe>`;
+<iframe title="Other origin" src="http://127.0.0.1:${port}/embedded/foreign"></iframe>
+<details id="status" style="display:inline-block"><summary role="button">Show status panel</summary>
+<iframe title="Status panel" srcdoc="<button>Clear status</button>"></iframe></details>
+<iframe title="Blob panel"></iframe>
+<script>
+const panel = document.querySelector('[title="Written panel"]').contentDocument;
+panel.open();
+panel.write(${JSON.stringify(`<button onclick="this.disabled = true">Confirm note</button>
+<iframe title="Written options" srcdoc="${escapeHtml('<button>Save preferences</button>')}"></iframe>`)});
+panel.close();
+const statusPanel = document.querySelector('#status');
+statusPanel.addEventListener('toggle', () => {
+  if (statusPanel.open) setTimeout(() => { statusPanel.open = false; }, 750);
+});
+const blobFrame = document.querySelector('[title="Blob panel"]');
+const activity = URL.createObjectURL(new Blob(['Activity'], { type: 'text/plain' }));
+blobFrame.src = URL.createObjectURL(new Blob([
+  '<button>Open activity</button><a download="activity.txt" href="' + activity + '">Download activity</a>'
+], { type: 'text/html' }));
+blobFrame.addEventListener('load', () => URL.revokeObjectURL(blobFrame.src), { once: true });
+window.addEventListener('pagehide', () => URL.revokeObjectURL(activity), { once: true });
+</script>`;
 
 // Per-user page: each test visits its own user, like suites that create a fresh user per test.
 const profilePage = (username: string) =>

@@ -165,8 +165,20 @@ const tests: DemoTest[] = [
       const note = page.frameLocator('[title="Note panel"]').getByRole('textbox', { name: 'Panel note' });
       await note.fill('ProoflineFrameInputMarker', { timeout: 2000 });
       if (await note.inputValue() !== 'ProoflineFrameInputMarker') throw new Error('note value');
-      await page.frameLocator('[title="Backup panel"]').getByRole('textbox', { name: 'Panel note' }).waitFor({ timeout: 2000 });
+      const backup = page.frameLocator('[title="Backup panel"]');
+      await backup.getByRole('textbox', { name: 'Panel note' }).waitFor({ timeout: 2000 });
+      await backup.frameLocator('[title="Review panel"]').getByRole('button', { name: 'Review note' }).waitFor({ timeout: 2000 });
+      const written = page.frameLocator('[title="Written panel"]');
+      const confirm = written.getByRole('button', { name: 'Confirm note' });
+      await confirm.click({ timeout: 2000 });
+      if (!(await confirm.isDisabled())) throw new Error('note was not confirmed');
+      await written.frameLocator('[title="Written options"]').getByRole('button').waitFor({ timeout: 2000 });
+      await page.frameLocator('[title="Blob panel"]').getByRole('button').waitFor({ timeout: 2000 });
       await page.frameLocator('[title="Other origin"]').getByRole('button').waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Show status panel' }).click({ timeout: 2000 });
+      const clearStatus = page.frameLocator('[title="Status panel"]').getByRole('button', { name: 'Clear status' });
+      await clearStatus.waitFor({ timeout: 2000 });
+      await page.waitForFunction(() => document.querySelector<HTMLDetailsElement>('#status')?.open === false, undefined, { timeout: 2000 });
     },
   },
   // demo/tests/help.spec.ts: the old view lingers after a client-side route change (no route bleed)
