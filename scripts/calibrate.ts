@@ -162,6 +162,11 @@ const tests: DemoTest[] = [
       const saved = page.frameLocator('[title="Saved panel"]');
       await saved.getByRole('button', { name: 'Save panel' }).click({ timeout: 2000 });
       await saved.getByText('Saved', { exact: true }).waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Update saved panel' }).click({ timeout: 2000 });
+      const close = saved.getByRole('button', { name: 'Close panels' });
+      await close.click({ timeout: 2000 });
+      if (!(await close.isDisabled())) throw new Error('saved panel was not closed');
+      await saved.frameLocator('[title="Saved options"]').getByRole('button').waitFor({ timeout: 2000 });
       const note = page.frameLocator('[title="Note panel"]').getByRole('textbox', { name: 'Panel note' });
       await note.fill('ProoflineFrameInputMarker', { timeout: 2000 });
       if (await note.inputValue() !== 'ProoflineFrameInputMarker') throw new Error('note value');
@@ -179,6 +184,34 @@ const tests: DemoTest[] = [
       const clearStatus = page.frameLocator('[title="Status panel"]').getByRole('button', { name: 'Clear status' });
       await clearStatus.waitFor({ timeout: 2000 });
       await page.waitForFunction(() => document.querySelector<HTMLDetailsElement>('#status')?.open === false, undefined, { timeout: 2000 });
+      const compact = page.getByRole('checkbox', { name: 'Compact mode' });
+      await compact.check({ timeout: 2000 });
+      await page.locator('#compact-panel').waitFor({ timeout: 2000 });
+      await page.frameLocator('#compact-panel').getByRole('button').waitFor({ timeout: 2000 });
+      await eventually(async () => !(await compact.isChecked()), 'compact panel closed');
+    },
+  },
+  {
+    testId: 'embedded-settings', title: 'saves settings inside an inline frame',
+    file: 'demo/tests/embedded.spec.ts', line: 37, start: '/embedded/settings',
+    body: async (page) => {
+      const save = page.frameLocator('[title="Frame settings"]').getByRole('button', { name: 'Save settings' });
+      await save.click({ timeout: 2000 });
+      if (!(await save.isDisabled())) throw new Error('settings were not saved');
+    },
+  },
+  {
+    testId: 'embedded-preview', title: 'opens frame settings after visiting a preview',
+    file: 'demo/tests/embedded.spec.ts', line: 44, start: '/embedded/preview',
+    body: async (page) => {
+      await page.frameLocator('[title="Preview"]').getByRole('button', { name: 'Close preview' }).waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Open settings' }).click({ timeout: 2000 });
+      await eventually(async () => new URL(page.url()).pathname === '/embedded/settings', 'frame settings route');
+      const save = page.frameLocator('[title="Frame settings"]').getByRole('button', { name: 'Save settings' });
+      await save.waitFor({ timeout: 2000 });
+      await page.goBack();
+      await page.getByRole('button', { name: 'Open settings' }).click({ timeout: 2000 });
+      await save.waitFor({ timeout: 2000 });
     },
   },
   // demo/tests/help.spec.ts: the old view lingers after a client-side route change (no route bleed)

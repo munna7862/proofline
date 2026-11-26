@@ -158,38 +158,80 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
   const frameStateKey = Symbol.for('proofline.frameState');
-  type FrameState = { slots: WeakMap<Element, number>; next: number; inlineView?: string };
+  type FrameSlots = { numbers: WeakMap<Element, number>; holders: Map<number, WeakRef<Element>> };
+  type FrameState = {
+    byView: Map<string, FrameSlots>;
+    embeddingViews: WeakMap<Element, string>;
+    inlineView?: string;
+    rewrittenRoute?: { href: string; view: string };
+  };
   const frameState = (doc: Document): FrameState => {
     const owner = doc as Document & { [frameStateKey]?: FrameState };
-    return owner[frameStateKey] ??= { slots: new WeakMap(), next: 1 };
+    return owner[frameStateKey] ??= { byView: new Map(), embeddingViews: new WeakMap() };
   };
-  const slotOf = (frame: Element, owner: FrameState) => {
-    const reserve = (node: Element) => {
-      if (!owner.slots.has(node)) owner.slots.set(node, owner.next++);
+  const slotOf = (frame: Element, owner: FrameState, view: string, slots: FrameSlots) => {
+    const doc = frame.ownerDocument;
+    const numberOf = (node: Element) => {
+      const number = slots.numbers.get(node);
+      return number !== undefined && slots.holders.get(number)?.deref() === node ? number : undefined;
     };
-    if (!owner.slots.has(frame)) {
-      // Reserve numbered slots in DOM order. Removing or moving a sibling must
-      // leave existing slots intact, including frames in separate shadow roots.
-      const doc = frame.ownerDocument;
+    let next = 1;
+    const reserve = (node: Element) => {
+      // An exiting frame can stay mounted while the next view renders.
+      const loadedUnder = owner.embeddingViews.get(node);
+      if (loadedUnder !== undefined && loadedUnder !== view) return;
+      owner.embeddingViews.set(node, view);
+      if (numberOf(node) !== undefined) return;
+      while (true) {
+        const holder = slots.holders.get(next)?.deref();
+        if (!holder?.isConnected || holder.ownerDocument !== doc || owner.embeddingViews.get(holder) !== view) break;
+        next++;
+      }
+      slots.numbers.set(node, next);
+      slots.holders.set(next++, new WeakRef(node));
+    };
+    if (numberOf(frame) === undefined) {
+      // Keep connected siblings in their existing slots. Visiting a route again
+      // can reuse vacated positions, while live siblings keep distinct views.
       doc.querySelectorAll('iframe,frame').forEach(reserve);
       const root = frame.getRootNode() as Document | ShadowRoot;
       if (root !== doc) root.querySelectorAll('iframe,frame').forEach(reserve);
       reserve(frame);
     }
-    return owner.slots.get(frame)!;
+    return slots.numbers.get(frame)!;
   };
   // Blank, srcdoc and blob documents have no application route of their own.
   const isInlineFrameUrl = (href: string) => /^(?:blob:|about:(?:blank|srcdoc)(?:[?#]|$))/.test(href);
   const inlineFrameView = (() => {
     const frame = frameChain[0];
-    if (!frame || !isInlineFrameUrl(location.href)) return;
-    const owner = frameState(frame.ownerDocument);
-    const slot = slotOf(frame, owner);
-    const view = owner.inlineView ? `${owner.inlineView}.${slot}` : `${viewOf(frame.ownerDocument.URL)}#frame-${slot}`;
+    if (!frame) return;
+    const doc = frame.ownerDocument;
+    const owner = frameState(doc);
+    const rewrite = owner.rewrittenRoute;
+    const parentView = owner.inlineView ?? (rewrite?.href === doc.URL ? rewrite.view : viewOf(doc.URL));
+    owner.embeddingViews.set(frame, parentView);
+    if (!isInlineFrameUrl(location.href)) return;
+    let slots = owner.byView.get(parentView);
+    if (!slots) {
+      slots = { numbers: new WeakMap(), holders: new Map() };
+      owner.byView.set(parentView, slots);
+    }
+    const slot = slotOf(frame, owner, parentView, slots);
+    const view = owner.inlineView ? `${parentView}.${slot}` : `${parentView}#frame-${slot}`;
     frameState(document).inlineView = view;
     return view;
   })();
   const currentViewOf = () => inlineFrameView ?? viewOf(location.href);
+  const routedFrameState = frameChain.length && !inlineFrameView ? frameState(document) : undefined;
+  let lastFrameView = routedFrameState ? currentViewOf() : undefined;
+  const observedView = () => {
+    if (!routedFrameState) return currentViewOf();
+    const rewrite = routedFrameState.rewrittenRoute;
+    if (rewrite?.href === location.href) return rewrite.view;
+    if (rewrite) delete routedFrameState.rewrittenRoute;
+    lastFrameView = currentViewOf();
+    return lastFrameView;
+  };
   const visitedFrameViews = new Set<string>();
   const visitFrameView = (view: string) => {
     if (!frameChain.length || visitedFrameViews.has(view)) return;
@@ -531,7 +573,15 @@ export function proofAgent(opts: AgentOptions): void {
 
   const onDomChanges = (changes: MutationRecord[]) => {
     // document.open() can replace a frame's content and clear its event listeners.
-    if (frameChain.length && changes.some(({ target }) => target === document)) listenForInteractions();
+    if (frameChain.length && changes.some(({ target }) => target === document)) {
+      const href = location.href;
+      // An ancestor opening this document can copy its own URL into the frame
+      // without navigation. Preserve the frame's route while that URL persists.
+      if (routedFrameState && lastFrameView && frameChain.some((frame) => frame.ownerDocument.URL === href)) {
+        routedFrameState.rewrittenRoute = { href, view: lastFrameView };
+      }
+      listenForInteractions();
+    }
     for (const change of changes) {
       const target = change.target as Element;
       const previous = change.oldValue?.toLowerCase();
@@ -593,7 +643,9 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const onUrlChange = (departure?: Departure) => {
+    if (routedFrameState) delete routedFrameState.rewrittenRoute;
     const view = currentViewOf();
+    if (routedFrameState) lastFrameView = view;
     if (!frameChain.length) emit({ type: 'view', view });
     else if (inVisibleFrame()) visitFrameView(view);
     if (view !== currentView) {
@@ -624,7 +676,7 @@ export function proofAgent(opts: AgentOptions): void {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
     document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
     if (!inVisibleFrame()) return;
-    const view = currentViewOf();
+    const view = observedView();
     visitFrameView(view);
     const positionOf = positionsInSnapshot();
     const fresh: any[] = [];
@@ -651,12 +703,20 @@ export function proofAgent(opts: AgentOptions): void {
     }, 250);
   };
 
-  // A frame can become visible due to an embedding document's attribute change.
-  // Observe only its ancestors and release them when the frame navigates away.
+  // A frame can become visible due to embedding attributes or CSS layout.
+  // Observe the frame and its ancestors until its document navigates away.
   const embeddingObserver = frameChain.length ? new MutationObserver(scheduleScan) : undefined;
+  const frameResize = frameChain.length && typeof ResizeObserver === 'function' ? new ResizeObserver(scheduleScan) : undefined;
+  const embeddingDocuments = new Set(frameChain.map((frame) => frame.ownerDocument));
   const watchEmbedding = () => {
     if (!embeddingObserver) return;
+    for (const doc of embeddingDocuments) {
+      // CSS can reveal a frame after a form change without altering its size.
+      doc.addEventListener('change', scheduleScan, true);
+      doc.defaultView?.addEventListener('resize', scheduleScan);
+    }
     for (const frame of frameChain) {
+      frameResize?.observe(frame);
       for (let ancestor: Element | null = frame; ancestor; ancestor = frameParent(ancestor)) {
         embeddingObserver.observe(ancestor, {
           attributes: true,
@@ -666,7 +726,14 @@ export function proofAgent(opts: AgentOptions): void {
     }
     scheduleScan();
   };
-  const unwatchEmbedding = () => embeddingObserver?.disconnect();
+  const unwatchEmbedding = () => {
+    embeddingObserver?.disconnect();
+    frameResize?.disconnect();
+    for (const doc of embeddingDocuments) {
+      doc.removeEventListener('change', scheduleScan, true);
+      doc.defaultView?.removeEventListener('resize', scheduleScan);
+    }
+  };
 
   const isFileFill = (ev: Event) =>
     (ev.type === 'input' || ev.type === 'change') &&
@@ -695,7 +762,7 @@ export function proofAgent(opts: AgentOptions): void {
     if (!el || isIgnored(el)) return;
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
     if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
-    const view = currentViewOf();
+    const view = observedView();
     visitFrameView(view);
     const positionOf = positionsInSnapshot();
     credit(el, view, ev.type, positionOf);
@@ -712,10 +779,12 @@ export function proofAgent(opts: AgentOptions): void {
     scheduleScan();
   };
 
+  const onPopState = () => onUrlChange();
   const listenForInteractions = () => {
     for (const type of ['click', 'dblclick', 'contextmenu', 'input', 'change', 'pointerdown']) {
       document.addEventListener(type, onEvent, true);
     }
+    window.addEventListener('popstate', onPopState);
     if (embeddingObserver) {
       window.addEventListener('pagehide', unwatchEmbedding);
       window.addEventListener('pageshow', watchEmbedding);
@@ -774,7 +843,6 @@ export function proofAgent(opts: AgentOptions): void {
   };
   wrapHistory('pushState');
   wrapHistory('replaceState');
-  window.addEventListener('popstate', () => onUrlChange());
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
