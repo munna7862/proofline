@@ -57,6 +57,34 @@ test('two values are not enough to learn a :param', () => {
   assert.deepEqual(s.views.map((v) => v.view).sort(), ['/users/asha_rao', '/users/ben_okafor']);
 });
 
+test('explicit view rules use the first match and remap link destinations before reporting', () => {
+  const records = [
+    visit('a', '/users/asha'),
+    visit('b', '/users/ben'),
+    visit('c', '/users/chen'),
+    visit('d', '/', [el('link', 'Profile', '/users/asha')]),
+  ];
+  const coverage = aggregateCoverage(records, {
+    viewRules: [
+      { pattern: '^/users/asha$', name: 'Pinned profile' },
+      { pattern: '^/users/', name: 'Profiles' },
+    ],
+  });
+  assert.deepEqual(coverage.views.map(({ view }) => view).sort(), ['/', 'Pinned profile', 'Profiles']);
+  const link = coverage.views.find(({ view }) => view === '/')!.elements[0]!;
+  assert.equal(link.href, 'Pinned profile');
+  assert.equal(link.reachedByUrl, true);
+  assert.equal(link.tested, false);
+});
+
+test('view rules can use names that also exist on Object.prototype', () => {
+  const rec = visit('a', '/forms', undefined, ['button|Follow|']);
+  const coverage = aggregateCoverage([rec], { viewRules: [{ pattern: '^/forms$', name: '__proto__' }] });
+  assert.equal(coverage.views[0]!.view, '__proto__');
+  assert.equal(coverage.tested, 1);
+  assert.equal(coverage.total, 1);
+});
+
 test('identical labels in separate shadow roots retain independent interaction credit', () => {
   const apply = (scope: string) => ({
     ...el('button', 'Apply'),

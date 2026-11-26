@@ -15,6 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { aggregateCoverage } from './coverage/aggregate.ts';
+import { loadCoverageConfig } from './config.ts';
 import { applyRecheck, judgeMutant, plannedResult, planMutants, proofHeadline, recheckTargets, summarizeProof } from './proof/plan.ts';
 import { DEFAULT_OPERATORS, OPERATORS } from './proof/operators.ts';
 import { loadSummaries, writeReport } from './report/write.ts';
@@ -52,8 +53,16 @@ function runPlaywright(args: string[], env: Record<string, string>, inherit = fa
 }
 
 function cmdReport(): void {
+  let options: ReturnType<typeof loadCoverageConfig>;
+  try {
+    options = loadCoverageConfig();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 2;
+    return;
+  }
   const records = readJsonDir<TestCoverageRecord>(paths.coverage);
-  const coverage = records.length ? aggregateCoverage(records) : undefined;
+  const coverage = records.length ? aggregateCoverage(records, options) : undefined;
   const file = writeReport({ coverage });
   console.log(`Report: ${displayPath(file)}`);
 }
@@ -185,6 +194,7 @@ const commands: Record<string, () => void> = { report: cmdReport, scan: cmdScan,
 const run = commands[command ?? ''];
 if (!run) {
   console.log('Usage: proofline <report|scan|replay|check|init>');
+  console.log('The coverage reporter and report command read optional proofline.config.json from the working directory.');
   process.exit(command ? 2 : 0);
 }
 run();

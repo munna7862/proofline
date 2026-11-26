@@ -11,6 +11,7 @@
 import { chromium, type BrowserContext, type Page } from 'playwright-core';
 import { attachCoverage, CoverageRecorder, flushCoverage } from '../src/coverage/collector.ts';
 import { aggregateCoverage } from '../src/coverage/aggregate.ts';
+import { parseCoverageConfig } from '../src/config.ts';
 import { injectMutant, NetworkRecorder } from '../src/proof/inject.ts';
 import { applyRecheck, judgeMutant, plannedResult, planMutants, recheckTargets, summarizeProof } from '../src/proof/plan.ts';
 import { renderReport } from '../src/report/html.ts';
@@ -428,6 +429,20 @@ async function main() {
     // ---- Compare with ground truth ----
     const expected = loadGroundTruth();
     failures.push(...compareWithGroundTruth(expected, coverage, proof));
+    const configured = expected.configuredCoverage;
+    if (configured) {
+      const result = aggregateCoverage(coverageRecords, parseCoverageConfig(configured.options));
+      if (result.tested !== configured.tested || result.total !== configured.total) {
+        failures.push(`configured coverage: expected ${configured.tested}/${configured.total}, got ${result.tested}/${result.total}`);
+      }
+      const excluded = result.views.filter(({ view }) => configured.excludedViews.includes(view));
+      if (excluded.length) failures.push(`configured coverage: unexpected views ${excluded.map(({ view }) => view).join(', ')}`);
+      const group = result.views.find(({ view }) => view === configured.groupedView.name);
+      const keys = group?.elements.map(({ key }) => key).sort() ?? [];
+      if (JSON.stringify(keys) !== JSON.stringify([...configured.groupedView.elements].sort())) {
+        failures.push(`configured coverage: unexpected controls in "${configured.groupedView.name}"`);
+      }
+    }
     failures.push(...checkArtifactPrivacy(expected, {
       ...artifacts,
       'raw coverage records': JSON.stringify(coverageRecords),
