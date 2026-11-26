@@ -241,6 +241,42 @@ export function proofAgent(opts: AgentOptions): void {
   const clean = (s: string | null | undefined) =>
     (s || '').replace(/\s+/g, ' ').trim().replace(/\d+/g, '#').slice(0, 80);
 
+  const shadowRootOf = (el: Element) => {
+    const root = el.getRootNode() as Document | ShadowRoot;
+    // An adopted component keeps its original JavaScript realm.
+    return root.nodeType === Node.DOCUMENT_FRAGMENT_NODE && 'host' in root ? root : null;
+  };
+  const insideClosedRoot = (el: Element) => {
+    for (let root = shadowRootOf(el); root; root = shadowRootOf(root.host)) {
+      if (root.mode === 'closed') return true;
+    }
+    return false;
+  };
+  const composedParent = (el: Element) =>
+    el.assignedSlot ?? el.parentElement ?? (el.getRootNode() as ShadowRoot).host ?? null;
+  const usesShadowTree = (el: Element) => {
+    if (shadowRootOf(el)) return true;
+    for (let node: Element | null = el; node; node = node.parentElement) {
+      if (node.assignedSlot) return true;
+    }
+    return false;
+  };
+  const closestInTree = (el: Element | null, selector: string) => {
+    for (let cur = el; cur; cur = composedParent(cur)) {
+      if (cur.matches(selector)) return cur;
+    }
+    return null;
+  };
+  const openRoots = new Set<ShadowRoot>();
+  const queryControls = (selector: string) => {
+    const matches = Array.from(document.querySelectorAll(selector));
+    for (const root of openRoots) {
+      if (!root.host.isConnected || root.host.ownerDocument !== document) openRoots.delete(root);
+      else if (!insideClosedRoot(root.host)) root.querySelectorAll(selector).forEach((el) => matches.push(el));
+    }
+    return matches;
+  };
+
   const roleOf = (el: Element) => {
     const explicit = el.getAttribute('role');
     if (explicit) return explicit;
@@ -260,21 +296,33 @@ export function proofAgent(opts: AgentOptions): void {
     return 'generic';
   };
 
-  const editingHosts = new WeakSet<Element>();
+  // A component can be moved or copied between same-origin frames. Preserve
+  // private field classifications across that frame tree without storing values.
+  const fieldPrivacyKey = Symbol.for('proofline.fieldPrivacy');
+  type FieldPrivacy = {
+    editingHosts: WeakSet<Element>;
+    textboxes: WeakSet<Element>;
+    valueFields: WeakSet<Element>;
+  };
+  const fieldPrivacyOwner = (frameChain.at(-1)?.ownerDocument ?? document) as Document & { [fieldPrivacyKey]?: FieldPrivacy };
+  const { editingHosts, textboxes, valueFields } = fieldPrivacyOwner[fieldPrivacyKey] ??= {
+    editingHosts: new WeakSet(),
+    textboxes: new WeakSet(),
+    valueFields: new WeakSet(),
+  };
   const isEditingHost = (el: Element) => {
     if (el.matches(opts.editableSelector)) editingHosts.add(el);
     return editingHosts.has(el);
   };
 
   const isDraftContent = (el: Element) => {
-    for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+    for (let cur: Element | null = el; cur; cur = composedParent(cur)) {
       if (isEditingHost(cur)) return true;
       if (cur.getAttribute('contenteditable')?.toLowerCase() === 'false') return false;
     }
     return false;
   };
 
-  const textboxes = new WeakSet<Element>();
   const isTextbox = (el: Element) => {
     if (el.getAttribute('role') === 'textbox') textboxes.add(el);
     return textboxes.has(el);
@@ -282,14 +330,13 @@ export function proofAgent(opts: AgentOptions): void {
 
   const hasValueText = (el: Element) => {
     if (isDraftContent(el)) return true;
-    for (let cur: Element | null = el; cur; cur = cur.parentElement) {
+    for (let cur: Element | null = el; cur; cur = composedParent(cur)) {
       if (isTextbox(cur)) return true;
     }
     return false;
   };
 
   // User-entered values are not labels. Contenteditable stores its value in DOM text.
-  const valueFields = new WeakSet<Element>();
   const isFieldInputType = (type: string) =>
     type !== 'submit' && type !== 'button' && type !== 'reset' && type !== 'image';
   const isField = (el: Element) => {
@@ -303,14 +350,20 @@ export function proofAgent(opts: AgentOptions): void {
     return valueFields.has(el);
   };
 
+  const isSlot = (el: Element): el is HTMLSlotElement =>
+    el.localName === 'slot' && typeof (el as HTMLSlotElement).assignedNodes === 'function';
   const labelText = (el: Element, rendered = false): string => {
     if (hasValueText(el)) return '';
-    if (!Array.from(el.getElementsByTagName('*')).some((child) => isEditingHost(child) || isTextbox(child))) {
+    const slot = isSlot(el) ? el : undefined;
+    if (!slot && !Array.from(el.getElementsByTagName('*')).some(
+      (child) => isSlot(child) || isEditingHost(child) || isTextbox(child),
+    )) {
       return (rendered && (el as HTMLElement).innerText) || el.textContent || '';
     }
-    // Drop value subtrees even when a surrounding control or aria-labelledby supplies the name.
-    return Array.from(el.childNodes, (node) =>
-      node instanceof Element ? labelText(node, rendered) : node.nodeType === 3 ? node.textContent : '',
+    // Follow projected labels, dropping value subtrees even when the value is slotted.
+    const assigned = slot?.assignedNodes({ flatten: true });
+    return Array.from(assigned?.length ? assigned : el.childNodes, (node) =>
+      node.nodeType === Node.ELEMENT_NODE ? labelText(node as Element, rendered) : node.nodeType === Node.TEXT_NODE ? node.textContent : '',
     ).join('');
   };
 
@@ -319,10 +372,11 @@ export function proofAgent(opts: AgentOptions): void {
     if (aria) return clean(aria);
     const labelledBy = el.getAttribute('aria-labelledby');
     if (labelledBy) {
+      const root = shadowRootOf(el) ?? document;
       const t = labelledBy
         .split(/\s+/)
         .map((id) => {
-          const label = document.getElementById(id);
+          const label = root.getElementById(id);
           return label ? labelText(label) : '';
         })
         .join(' ');
@@ -353,7 +407,7 @@ export function proofAgent(opts: AgentOptions): void {
   const testIdOf = (el: Element) =>
     el.getAttribute('data-testid') || el.getAttribute('data-test') || el.getAttribute('data-cy') || undefined;
 
-  const cssPath = (el: Element) => {
+  const cssPath = (el: Element, includeClasses = true) => {
     const parts: string[] = [];
     let cur: Element | null = el;
     while (cur && cur.nodeType === 1 && parts.length < 4) {
@@ -364,7 +418,7 @@ export function proofAgent(opts: AgentOptions): void {
         parts.unshift(part + '#' + id);
         break;
       }
-      const cls = (cur.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)[0];
+      const cls = includeClasses ? (cur.getAttribute('class') || '').trim().split(/\s+/).filter(Boolean)[0] : undefined;
       if (cls) part += '.' + cls;
       parts.unshift(part);
       cur = cur.parentElement;
@@ -396,7 +450,7 @@ export function proofAgent(opts: AgentOptions): void {
   // "Processing..." that no test can interact with.
   const isDisabled = (el: Element) => {
     try {
-      return el.matches(':disabled') || !!el.closest('[aria-busy="true"]');
+      return el.matches(':disabled') || !!closestInTree(el, '[aria-busy="true"]');
     } catch {
       return false;
     }
@@ -408,19 +462,22 @@ export function proofAgent(opts: AgentOptions): void {
   const positionsInSnapshot = () => {
     const positions = new WeakMap<Element, string>();
     const indexes = new WeakMap<Element, number>();
-    let idCounts: Map<string, number> | undefined;
-    const hasUniqueId = (id: string): boolean => {
+    const idsByRoot = new Map<Document | ShadowRoot, Map<string, number>>();
+    const hasUniqueId = (el: Element, id: string): boolean => {
+      const root = shadowRootOf(el) ?? document;
+      let idCounts = idsByRoot.get(root);
       if (!idCounts) {
         idCounts = new Map();
-        for (const node of document.querySelectorAll('[id]')) {
+        for (const node of root.querySelectorAll('[id]')) {
           const value = node.getAttribute('id')!;
           idCounts.set(value, (idCounts.get(value) ?? 0) + 1);
         }
+        idsByRoot.set(root, idCounts);
       }
       return idCounts.get(id) === 1;
     };
     const part = (node: Element): string => {
-      const parent = node.parentElement;
+      const parent = node.parentElement ?? shadowRootOf(node);
       if (parent && !indexes.has(node)) {
         const counts = new Map<string, number>();
         for (const child of parent.children) {
@@ -437,7 +494,7 @@ export function proofAgent(opts: AgentOptions): void {
         // The same ID already anchors the display path, so unrelated changes above it are irrelevant.
         const id = node.getAttribute('id');
         if (id) {
-          if (hasUniqueId(id)) return relative.reverse().join('/') || 'self';
+          if (hasUniqueId(node, id)) return relative.reverse().join('/') || 'self';
           break;
         }
         relative.push(part(node));
@@ -487,19 +544,17 @@ export function proofAgent(opts: AgentOptions): void {
 
   // Inside a dev-only overlay (DEVTOOLS_ROOTS) or a toast / live region (LIVE_REGIONS): not the app under test.
   const isIgnored = (el: Element) => {
-    if (!opts.ignoreSelector) return false;
     try {
-      return !!el.closest(opts.ignoreSelector);
+      return (opts.ignoreSelector && !!closestInTree(el, opts.ignoreSelector)) ||
+        (usesShadowTree(el) && !!closestInTree(el, '[hidden],[aria-hidden="true"]'));
     } catch {
       return false;
     }
   };
 
-  const frameParent = (el: Element) =>
-    el.assignedSlot ?? el.parentElement ?? (el.getRootNode() as ShadowRoot).host ?? null;
   const inVisibleFrame = () => frameChain.every((frame) => {
     if (!frame.isConnected || !frame.clientWidth || !frame.clientHeight) return false;
-    for (let ancestor: Element | null = frame; ancestor; ancestor = frameParent(ancestor)) {
+    for (let ancestor: Element | null = frame; ancestor; ancestor = composedParent(ancestor)) {
       if (ancestor.matches('[hidden],[aria-hidden="true"]') || isIgnored(ancestor)) return false;
     }
     if (typeof frame.checkVisibility === 'function') {
@@ -515,8 +570,51 @@ export function proofAgent(opts: AgentOptions): void {
   let nextField = 0;
 
   type ObservedElement = ReturnType<typeof describe> & { position: string | null };
-  const measure = (el: Element, positionOf: (el: Element) => string): ObservedElement =>
-    ({ ...describe(el), position: positionOf(el) });
+  const assignedScopes = new WeakMap<Element, Map<string, string>>();
+  const hostsByView = new Map<string, Map<string, WeakRef<Element>>>();
+  const scopeOf = (host: Element, view: string, preferred: string) => {
+    const holders = hostsByView.get(view) ?? new Map<string, WeakRef<Element>>();
+    hostsByView.set(view, holders);
+    const scopes = assignedScopes.get(host) ?? new Map<string, string>();
+    assignedScopes.set(host, scopes);
+    const previous = scopes.get(view);
+    if (previous && holders.get(previous)?.deref() === host) return previous;
+    // A live component keeps its original scope when its classes or position
+    // change. New components cannot take the scope of a live sibling.
+    let scope = preferred;
+    for (let suffix = 2; ; suffix++) {
+      const holder = holders.get(scope)?.deref();
+      if (!holder?.isConnected || holder.ownerDocument !== document) break;
+      scope = `${preferred}~${suffix}`;
+    }
+    holders.set(scope, new WeakRef(host));
+    scopes.set(view, scope);
+    return scope;
+  };
+  const measure = (el: Element, positionOf: (el: Element) => string, view: string): ObservedElement => {
+    const element = describe(el);
+    const position = positionOf(el);
+    const hosts: Element[] = [];
+    for (let root = shadowRootOf(el); root; root = shadowRootOf(root.host)) {
+      hosts.unshift(root.host);
+    }
+    if (!hosts.length) return { ...element, position };
+    const paths: string[] = [];
+    let scope = '';
+    for (const host of hosts) {
+      const path = cssPath(host);
+      const location = `${cssPath(host, false)}@${positionOf(host)}`;
+      scope = scopeOf(host, view, scope ? `${scope} / ${location}` : location);
+      paths.push(path);
+    }
+    return {
+      ...element,
+      key: `${element.key}|shadow:${scope}`,
+      path: [...paths, element.path].join(' > #shadow-root > '),
+      position: `${scope}/${position}`,
+      ...(element.list ? { list: `${scope} > ${element.list}` } : {}),
+    };
+  };
 
   const observe = (el: Element, view: string, measured: ObservedElement) => {
     const element = { ...measured };
@@ -568,7 +666,7 @@ export function proofAgent(opts: AgentOptions): void {
   let changedAt = 0;
   let awaitingSettleScan = false;
   let pendingDeparture: Departure | undefined;
-  let documentObserver: MutationObserver | undefined;
+  let started = false;
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
   const onDomChanges = (changes: MutationRecord[]) => {
@@ -582,32 +680,40 @@ export function proofAgent(opts: AgentOptions): void {
       }
       listenForInteractions();
     }
+    const examined = new WeakSet<Element>();
     for (const change of changes) {
       const target = change.target as Element;
-      const previous = change.oldValue?.toLowerCase();
       // A control can briefly hold a value before a scan sees its new role or type.
-      if (change.attributeName === 'contenteditable') {
-        if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
-        isEditingHost(target);
-      } else if (change.attributeName === 'role' && previous === 'textbox') {
-        textboxes.add(target);
-      } else if (change.attributeName === 'type' && target.tagName === 'INPUT' && isFieldInputType(previous ?? 'text')) {
-        valueFields.add(target);
+      // Before startup the document observer discovers roots; only the newly
+      // observed shadow controls need their own pre-start field history.
+      if (change.type === 'attributes' && target.ownerDocument === document && (started || shadowRootOf(target))) {
+        const previous = change.oldValue?.toLowerCase();
+        if (change.attributeName === 'contenteditable') {
+          if (previous === '' || previous === 'true' || previous === 'plaintext-only') editingHosts.add(target);
+          isEditingHost(target);
+        } else if (change.attributeName === 'role' && previous === 'textbox') {
+          textboxes.add(target);
+        } else if (change.attributeName === 'type' && target.tagName === 'INPUT' && isFieldInputType(previous ?? 'text')) {
+          valueFields.add(target);
+        }
+      }
+      for (const node of change.addedNodes) {
+        if (node.nodeType === Node.ELEMENT_NODE) discoverRoots(node as Element, examined);
       }
     }
-    scheduleScan();
+    if (started) scheduleScan();
   };
 
   const visibleShell = (node: Element) => {
-    if (!node.isConnected || isIgnored(node) || node.closest('[hidden],[aria-hidden="true"]') || !inVisibleFrame()) return null;
-    const landmark = node.closest(SHELL_SELECTOR);
+    if (!node.isConnected || isIgnored(node) || closestInTree(node, '[hidden],[aria-hidden="true"]') || !inVisibleFrame()) return null;
+    const landmark = closestInTree(node, SHELL_SELECTOR);
     if (!landmark) return null;
     if (typeof node.checkVisibility === 'function') {
       return node.checkVisibility({ opacityProperty: true, visibilityProperty: true }) ? landmark : null;
     }
     const visibility = getComputedStyle(node).visibility;
     if (visibility === 'hidden' || visibility === 'collapse' || !isVisible(node)) return null;
-    for (let ancestor: Element | null = node; ancestor; ancestor = ancestor.parentElement) {
+    for (let ancestor: Element | null = node; ancestor; ancestor = composedParent(ancestor)) {
       if (getComputedStyle(ancestor).opacity === '0') return null;
     }
     return landmark;
@@ -626,7 +732,7 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const captureDeparture = (): Departure | undefined => {
-    if (!awaitingSettleScan || !documentObserver) return;
+    if (!awaitingSettleScan || !started) return;
     // History calls can occur before the observer delivers edits from this same JS task.
     const queuedChanges = documentObserver.takeRecords();
     if (queuedChanges.length) onDomChanges(queuedChanges);
@@ -634,10 +740,10 @@ export function proofAgent(opts: AgentOptions): void {
     confirmDeparture();
     const controls: Departure['controls'] = [];
     const positionOf = positionsInSnapshot();
-    for (const node of document.querySelectorAll(opts.interactiveSelector)) {
+    for (const node of queryControls(opts.interactiveSelector)) {
       if (!carried.has(node)) continue;
       const landmark = visibleShell(node);
-      if (landmark) controls.push({ node, landmark, element: measure(node, positionOf) });
+      if (landmark) controls.push({ node, landmark, element: measure(node, positionOf, currentView) });
     }
     if (controls.length) return { view: currentView, controls };
   };
@@ -653,7 +759,7 @@ export function proofAgent(opts: AgentOptions): void {
       currentView = view;
       carried = new WeakSet();
       try {
-        document.querySelectorAll(opts.interactiveSelector).forEach((el) => carried.add(el));
+        queryControls(opts.interactiveSelector).forEach((el) => carried.add(el));
       } catch {
         /* never break the app */
       }
@@ -674,7 +780,7 @@ export function proofAgent(opts: AgentOptions): void {
 
   const scan = (final = false) => {
     // Track hosts even when they are hidden or later lose the contenteditable attribute.
-    document.querySelectorAll(opts.editableSelector).forEach((el) => editingHosts.add(el));
+    queryControls(opts.editableSelector).forEach((el) => editingHosts.add(el));
     if (!inVisibleFrame()) return;
     const view = observedView();
     visitFrameView(view);
@@ -684,11 +790,11 @@ export function proofAgent(opts: AgentOptions): void {
     if (settled) awaitingSettleScan = false;
     confirmDeparture();
     const holding = !final && !settled;
-    document.querySelectorAll(opts.interactiveSelector).forEach((el) => {
+    queryControls(opts.interactiveSelector).forEach((el) => {
       if (holding && carried.has(el)) return;
       if (isIgnored(el)) return;
       if (!isVisible(el)) return;
-      const entry = observe(el, view, measure(el, positionOf));
+      const entry = observe(el, view, measure(el, positionOf, view));
       if (entry.fresh) fresh.push({ ...entry.element, nodeId: entry.nodeId });
     });
     if (fresh.length) emit({ type: 'inventory', view, elements: fresh });
@@ -717,7 +823,7 @@ export function proofAgent(opts: AgentOptions): void {
     }
     for (const frame of frameChain) {
       frameResize?.observe(frame);
-      for (let ancestor: Element | null = frame; ancestor; ancestor = frameParent(ancestor)) {
+      for (let ancestor: Element | null = frame; ancestor; ancestor = composedParent(ancestor)) {
         embeddingObserver.observe(ancestor, {
           attributes: true,
           attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'height', 'width', 'open'],
@@ -735,17 +841,24 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
 
-  const isFileFill = (ev: Event) =>
+  const isFileFill = (ev: Event, target: Element) =>
     (ev.type === 'input' || ev.type === 'change') &&
-    (ev.target as HTMLInputElement | null)?.tagName === 'INPUT' &&
-    ((ev.target as HTMLInputElement).type || '').toLowerCase() === 'file';
+    target.tagName === 'INPUT' &&
+    ((target as HTMLInputElement).type || '').toLowerCase() === 'file';
+
+  const containsInTree = (ancestor: Element, el: Element) => {
+    for (let cur = composedParent(el); cur; cur = composedParent(cur)) {
+      if (cur === ancestor) return true;
+    }
+    return false;
+  };
 
   const credit = (el: Element, view: string, event: string, positionOf: (el: Element) => string) => {
     // The element the test just used is live in this view (even one held after a route change):
     // record it now, before the test can navigate away ahead of the next scan, so every
     // interaction has an inventory entry.
     carried.delete(el);
-    const { element, nodeId, fresh } = observe(el, view, measure(el, positionOf));
+    const { element, nodeId, fresh } = observe(el, view, measure(el, positionOf, view));
     if (fresh) emit({ type: 'inventory', view, elements: [{ ...element, nodeId }] });
     emit({ type: 'interaction', view, key: element.key, nodeId, event });
   };
@@ -754,11 +867,12 @@ export function proofAgent(opts: AgentOptions): void {
     el.matches('[aria-haspopup],[aria-expanded]') && !el.matches(':disabled');
 
   const onEvent = (ev: Event) => {
-    if (!ev.isTrusted && !isFileFill(ev)) return;
-    if (!inVisibleFrame()) return;
-    const target = ev.target as Element | null;
-    if (!target || typeof (target as any).closest !== 'function') return;
-    const el = target.closest(opts.interactiveSelector);
+    // Composed events cross the shadow boundary and are handled once at the document.
+    if (ev.composed && ev.currentTarget !== document) return;
+    const target = ev.composedPath()[0] as Element | undefined;
+    if (!target?.isConnected || target.ownerDocument !== document || typeof target.closest !== 'function') return;
+    if ((!ev.isTrusted && !isFileFill(ev, target)) || !inVisibleFrame() || insideClosedRoot(target)) return;
+    const el = closestInTree(target, opts.interactiveSelector);
     if (!el || isIgnored(el)) return;
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.
     if (ev.type === 'pointerdown' && !isPointerTrigger(el)) return;
@@ -767,11 +881,12 @@ export function proofAgent(opts: AgentOptions): void {
     const positionOf = positionsInSnapshot();
     credit(el, view, ev.type, positionOf);
     if (ev.isTrusted) {
-      const wrapper = el.parentElement?.closest(opts.interactiveSelector);
+      const wrapper = closestInTree(composedParent(el), opts.interactiveSelector);
       if (wrapper && (roleOf(wrapper) === 'link' || roleOf(wrapper) === 'button') &&
           !wrapper.matches(':disabled') && (ev.type !== 'pointerdown' || isPointerTrigger(wrapper)) &&
-          !Array.from(wrapper.querySelectorAll(opts.interactiveSelector)).some(
-            (descendant) => descendant !== el && !isIgnored(descendant) && isVisible(descendant),
+          !queryControls(opts.interactiveSelector).some(
+            (descendant) => descendant !== el && containsInTree(wrapper, descendant) &&
+              !isIgnored(descendant) && isVisible(descendant),
           )) {
         credit(wrapper, view, ev.type, positionOf);
       }
@@ -780,10 +895,13 @@ export function proofAgent(opts: AgentOptions): void {
   };
 
   const onPopState = () => onUrlChange();
-  const listenForInteractions = () => {
+  const listenOn = (target: Document | ShadowRoot) => {
     for (const type of ['click', 'dblclick', 'contextmenu', 'input', 'change', 'pointerdown']) {
-      document.addEventListener(type, onEvent, true);
+      target.addEventListener(type, onEvent, true);
     }
+  };
+  const listenForInteractions = () => {
+    listenOn(document);
     window.addEventListener('popstate', onPopState);
     if (embeddingObserver) {
       window.addEventListener('pagehide', unwatchEmbedding);
@@ -791,6 +909,105 @@ export function proofAgent(opts: AgentOptions): void {
     }
   };
   listenForInteractions();
+
+  const observationOptions: MutationObserverInit = {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeOldValue: true,
+    attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable',
+      'id', 'name', 'type', 'for', 'role', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
+      'data-testid', 'data-test', 'data-cy', 'slot'],
+  };
+  const documentObserver = new MutationObserver(onDomChanges);
+  documentObserver.observe(document, observationOptions);
+  const registeredRoots = new WeakSet<ShadowRoot>();
+  let hasRegisteredRoot = false;
+  const registerRoot = (root: ShadowRoot) => {
+    if (root.mode !== 'open' || root.host.ownerDocument !== document || insideClosedRoot(root.host)) return;
+    if (!registeredRoots.has(root)) {
+      registeredRoots.add(root);
+      documentObserver.observe(root, observationOptions);
+    }
+    hasRegisteredRoot = true;
+    listenOn(root);
+    openRoots.add(root);
+  };
+  const discoverRoots = (element: Element, examined: WeakSet<Element>) => {
+    const pending = [element];
+    while (pending.length) {
+      const node = pending.pop()!;
+      if (examined.has(node)) continue;
+      examined.add(node);
+      const root = node.shadowRoot;
+      if (root) {
+        registerRoot(root);
+        for (const child of root.children) pending.push(child);
+      }
+      for (const child of node.children) pending.push(child);
+    }
+  };
+
+  // Opening a root on an existing host emits no DOM mutation on the host.
+  const originalAttachShadow = Element.prototype.attachShadow;
+  Element.prototype.attachShadow = function attachShadow(this: Element, options: ShadowRootInit) {
+    const root = originalAttachShadow.call(this, options);
+    try {
+      registerRoot(root);
+      if (started && root.mode === 'open') scheduleScan();
+    } catch {
+      /* never change the result of attaching a root */
+    }
+    return root;
+  };
+
+  // Clonable roots are created by the browser without calling attachShadow.
+  // Observe the copy before app code can turn its draft content into button text.
+  const protectClonedTree = (source: Node, copy: Node) => {
+    if (!hasRegisteredRoot && source.ownerDocument === copy.ownerDocument) return;
+    try {
+      const records = documentObserver.takeRecords();
+      if (records.length) onDomChanges(records);
+      const pending: [Node | null, Node][] = [[source, copy]];
+      while (pending.length) {
+        const [from, to] = pending.pop()!;
+        if (to.nodeType === Node.ELEMENT_NODE) {
+          const element = to as Element;
+          const original = from?.nodeType === Node.ELEMENT_NODE ? from as Element : null;
+          if (original?.localName === element.localName) {
+            // Only copy field classifications. Values stay in the page.
+            if (editingHosts.has(original)) editingHosts.add(element);
+            if (textboxes.has(original)) textboxes.add(element);
+            if (valueFields.has(original)) valueFields.add(element);
+          }
+          if (element.shadowRoot) {
+            registerRoot(element.shadowRoot);
+            pending.push([original?.shadowRoot ?? null, element.shadowRoot]);
+          }
+        }
+        let originalChild = from?.firstChild ?? null;
+        for (const child of to.childNodes) {
+          pending.push([originalChild, child]);
+          originalChild = originalChild?.nextSibling ?? null;
+        }
+      }
+    } catch {
+      /* never change the result of cloning a node */
+    }
+  };
+  const originalCloneNode = Node.prototype.cloneNode;
+  Node.prototype.cloneNode = function cloneNode(this: Node, deep?: boolean) {
+    const copy = originalCloneNode.call(this, deep);
+    protectClonedTree(this, copy);
+    return copy;
+  };
+  const originalImportNode = Document.prototype.importNode;
+  Document.prototype.importNode = function importNode<T extends Node>(this: Document, node: T, deep?: boolean): T {
+    const copy = originalImportNode.call(this, node, deep) as T;
+    protectClonedTree(node, copy);
+    return copy;
+  };
 
   // Called by the collector when the test ends. If a route change is still on hold, wait it
   // out first (at most HOLD_MS) so the old view's leftovers can unmount; whatever is still on
@@ -809,20 +1026,14 @@ export function proofAgent(opts: AgentOptions): void {
     });
 
   const start = () => {
+    if (started) return;
+    const queued = documentObserver.takeRecords();
+    if (queued.length) onDomChanges(queued);
+    if (document.documentElement) discoverRoots(document.documentElement, new WeakSet());
+    started = true;
     currentView = currentViewOf();
     if (!frameChain.length) emit({ type: 'view', view: currentView });
     scan();
-    documentObserver = new MutationObserver(onDomChanges);
-    documentObserver.observe(frameChain.length ? document : document.documentElement, {
-      subtree: true,
-      childList: true,
-      characterData: true,
-      attributes: true,
-      attributeOldValue: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden', 'disabled', 'aria-busy', 'contenteditable',
-        'id', 'name', 'type', 'for', 'role', 'aria-label', 'aria-labelledby', 'placeholder', 'title',
-        'data-testid', 'data-test', 'data-cy'],
-    });
     if (embeddingObserver) watchEmbedding();
   };
 

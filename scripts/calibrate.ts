@@ -40,6 +40,57 @@ type DemoTest = TestRef & { start?: string; expectFail?: boolean; body: (page: P
 let tipRuns = 0;
 const tests: DemoTest[] = [
   {
+    testId: 'shadow-components', title: 'uses preferences inside open shadow roots',
+    file: 'demo/tests/components.spec.ts', line: 3, start: '/components',
+    body: async (page) => {
+      const panel = page.locator('#preferences');
+      const preference = panel.getByRole('textbox', { name: 'Preference name' });
+      await preference.fill('ProoflineShadowInputMarker', { timeout: 2000 });
+      if (await preference.inputValue() !== 'ProoflineShadowInputMarker') throw new Error('preference value');
+      await panel.getByRole('button', { name: 'Apply', exact: true }).click({ timeout: 2000 });
+      await panel.getByText('Preferences applied').waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Open security' }).click({ timeout: 2000 });
+      const security = panel.locator('#security');
+      await security.getByLabel('Proof document').setInputFiles({
+        name: 'ProoflineShadowFilenameMarker.txt', mimeType: 'text/plain', buffer: Buffer.from('synthetic proof'),
+      }, { timeout: 2000 });
+      await security.getByRole('button', { name: 'Apply' }).waitFor({ timeout: 2000 });
+      const backup = page.locator('#backup');
+      await backup.getByRole('textbox', { name: 'Backup note' }).fill('ProoflineShadowDraftMarker', { timeout: 2000 });
+      await page.getByRole('button', { name: 'Preview backup' }).click({ timeout: 2000 });
+      if (await textOf(page, '#backup-preview #draft') !== 'ProoflineShadowDraftMarker') throw new Error('draft preview');
+      await page.getByRole('button', { name: 'Lock backup' }).click({ timeout: 2000 });
+      if (await backup.locator('#draft').getAttribute('contenteditable') !== 'false') throw new Error('backup not locked');
+      await backup.getByRole('button', { name: 'Apply', exact: true }).waitFor({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Import component' }).click({ timeout: 2000 });
+      const imported = page.getByRole('button', { name: 'Use imported component' });
+      await imported.click({ timeout: 2000 });
+      if (!(await imported.isDisabled())) throw new Error('imported component unused');
+      const secondBoard = page.locator('[data-board="second"]');
+      await secondBoard.getByRole('button', { name: 'Apply' }).click({ timeout: 2000 });
+      if (await secondBoard.getAttribute('class') !== 'active') throw new Error('second board inactive');
+      await page.getByRole('button', { name: 'Prepend board' }).click({ timeout: 2000 });
+      await page.getByRole('button', { name: 'Refresh', exact: true }).waitFor({ timeout: 2000 });
+    },
+  },
+  {
+    testId: 'shadow-idle-board', title: 'saves the idle board',
+    file: 'demo/tests/components.spec.ts', line: 41, start: '/components/styles',
+    body: async (page) => {
+      const save = page.getByRole('button', { name: 'Save board' });
+      await save.click({ timeout: 2000 });
+      if (!(await save.isDisabled())) throw new Error('board not saved');
+    },
+  },
+  {
+    testId: 'shadow-active-board', title: 'sees the same board with its active style',
+    file: 'demo/tests/components.spec.ts', line: 48, start: '/components/styles?active',
+    body: async (page) => {
+      if (await page.locator('x-board').getAttribute('class') !== 'active') throw new Error('board not active');
+      await page.getByRole('button', { name: 'Save board' }).waitFor({ timeout: 2000 });
+    },
+  },
+  {
     testId: 'd1', title: 'draft editor accepts text without using it as a control label',
     file: 'demo/tests/drafts.spec.ts', line: 3, start: '/settings/drafts#/editor?draft=ProoflineRouteMarker',
     body: async (page) => {

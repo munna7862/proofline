@@ -13,6 +13,8 @@ Coverage uses labels and field metadata for contenteditable controls, keeps draf
 
 Visible same-origin frames contribute UI coverage. URL-backed frames use their own view paths. Inline frames use the embedding path at load and a positional suffix such as `#frame-2`. Cross-origin and opaque sandboxed frames are outside UI coverage.
 
+Coverage includes controls in open shadow roots, including nested roots. Controls with the same label in separate roots retain their own coverage rows.
+
 ## Status
 
 Version `0.1.0`, pre-release. **Not published to npm yet** (the unscoped name `proofline` on npm belongs to an unrelated package; install from source as shown below).

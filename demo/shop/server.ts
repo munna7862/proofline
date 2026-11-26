@@ -150,6 +150,87 @@ document.addEventListener('click', (event) => {
 window.addEventListener('popstate', render);
 </script>`;
 
+const SHADOW_PAGE = `<!doctype html><title>Preferences components</title>
+<span id="setting-label">Light DOM label</span>
+<button id="open-security">Open security</button>
+<button id="preview-draft">Preview backup</button>
+<button id="lock-draft">Lock backup</button>
+<button id="import-component">Import component</button>
+<button id="prepend-board">Prepend board</button>
+<x-panel id="preferences"><span slot="apply-label">Apply</span>
+  <button slot="private-action">ProoflineSlottedHiddenMarker</button>
+</x-panel>
+<x-panel id="backup"><template shadowrootmode="open" shadowrootclonable>
+  <button>Apply</button>
+  <div id="draft" role="textbox" contenteditable="true" aria-label="Backup note" style="min-height:1em"></div>
+</template></x-panel>
+<x-panel id="closed"></x-panel>
+<x-panel id="notifications" aria-live="polite"></x-panel>
+<iframe id="component-source" title="Component source" srcdoc="<p>Component staging area</p>"></iframe>
+<div id="boards"><x-board data-board="first"></x-board><x-board data-board="second"></x-board></div>
+<script>
+const panel = document.querySelector('#preferences').attachShadow({ mode: 'open' });
+panel.innerHTML = '<span id="setting-label">Preference name</span><input aria-labelledby="setting-label">' +
+  '<button id="apply-main"><slot name="apply-label"></slot></button><button>Reset</button><p id="outcome"></p><div id="security"></div>' +
+  '<div aria-hidden="true"><slot name="private-action"></slot></div>';
+panel.querySelector('#apply-main').addEventListener('click', () => {
+  panel.querySelector('#outcome').textContent = 'Preferences applied';
+});
+document.querySelector('#open-security').addEventListener('click', () => {
+  const host = panel.querySelector('#security');
+  if (!host.shadowRoot) host.attachShadow({ mode: 'open' }).innerHTML =
+    '<label>Proof document <input type="file"></label><button>Apply</button>';
+});
+const backup = document.querySelector('#backup');
+const lockDraft = (host) => {
+  const draft = host.shadowRoot.querySelector('#draft');
+  draft.contentEditable = 'false';
+  draft.setAttribute('role', 'button');
+  draft.removeAttribute('aria-label');
+};
+document.querySelector('#preview-draft').addEventListener('click', () => {
+  const preview = backup.cloneNode(true);
+  preview.id = 'backup-preview';
+  backup.after(preview);
+  preview.shadowRoot.querySelector('button').remove();
+  lockDraft(preview);
+});
+document.querySelector('#lock-draft').addEventListener('click', () => lockDraft(backup));
+document.querySelector('#import-component').addEventListener('click', () => {
+  const source = document.querySelector('#component-source').contentDocument;
+  const detached = source.createElement('x-panel').attachShadow({ mode: 'open' });
+  detached.innerHTML = '<input type="file" aria-label="ProoflineDetachedShadowMarker">';
+  detached.querySelector('input').dispatchEvent(new Event('change', { bubbles: true }));
+  const imported = source.createElement('x-panel');
+  imported.id = 'imported';
+  imported.attachShadow({ mode: 'open' }).innerHTML = '<button onclick="this.disabled = true">Use imported component</button>';
+  source.body.append(imported);
+  document.body.append(imported);
+});
+const startBoard = (host, label) => {
+  const root = host.attachShadow({ mode: 'open' });
+  const button = document.createElement('button');
+  button.textContent = label;
+  root.append(button);
+  button.addEventListener('click', () => host.classList.toggle('active'));
+};
+document.querySelectorAll('#boards x-board').forEach((host) => startBoard(host, 'Apply'));
+document.querySelector('#prepend-board').addEventListener('click', () => {
+  const host = document.createElement('x-board');
+  document.querySelector('#boards').prepend(host);
+  startBoard(host, 'Refresh');
+});
+document.querySelector('#closed').attachShadow({ mode: 'closed' }).innerHTML = '<button>ProoflineClosedShadowMarker</button>';
+document.querySelector('#notifications').attachShadow({ mode: 'open' }).innerHTML = '<button>ProoflineIgnoredShadowMarker</button>';
+</script>`;
+
+const styledBoardPage = (active: boolean) => `<!doctype html><title>Styled board</title>
+<main id="styled-board"><x-board class="${active ? 'active' : 'idle'}"></x-board></main>
+<script>
+const root = document.querySelector('x-board').attachShadow({ mode: 'open' });
+root.innerHTML = '<button onclick="this.disabled = true">Save board</button>';
+</script>`;
+
 // Per-user page: each test visits its own user, like suites that create a fresh user per test.
 const profilePage = (username: string) =>
   `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Profile</title></head><body>
@@ -461,6 +542,8 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/embedded/preview') return res.end(FRAME_HISTORY_PAGE);
     if (url.pathname === '/embedded/controls') return res.end(EMBEDDED_CONTROLS);
     if (url.pathname === '/embedded/foreign') return res.end('<!doctype html><button>ProoflineForeignFrameMarker</button>');
+    if (url.pathname === '/components') return res.end(SHADOW_PAGE);
+    if (url.pathname === '/components/styles') return res.end(styledBoardPage(url.searchParams.has('active')));
     if (url.pathname === '/help' || url.pathname === '/help/faq') return res.end(HELP_PAGE);
     if (url.pathname === '/community') return res.end(communityPage(posts));
     if (url.pathname === '/users/links') {
