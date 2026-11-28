@@ -355,6 +355,33 @@ document.getElementById('start').addEventListener('click', () => {
 </script>
 </body></html>`;
 
+// A form view the app leaves on the first keystroke, before the agent's debounced scan.
+// The footer control is plain layout (no header or nav) and persists across every view;
+// the old step lingers into the form view and is gone once the done view settles.
+const QUICK_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Quick form</title></head><body>
+<main><button id="begin">Begin quick form</button></main>
+<div id="old-step"><button>Old step</button></div>
+<div class="footer"><button id="theme">Theme</button></div>
+<script>
+const main = document.querySelector('main');
+document.getElementById('begin').addEventListener('click', () => {
+  history.pushState(null, '', '/quick/form');
+  main.innerHTML = '<label>Code <input id="code"></label><button id="cancel">Cancel code</button>';
+  document.getElementById('code').addEventListener('input', () => {
+    // Removing the focused field fires its change event, so finish the form view first.
+    main.textContent = 'Checking code';
+    history.pushState(null, '', '/quick/check');
+    // A second fast view, left before its own hold ends.
+    setTimeout(() => {
+      main.textContent = 'Quick form done';
+      history.pushState(null, '', '/quick/done');
+      setTimeout(() => document.getElementById('old-step').remove(), 300);
+    }, 100);
+  });
+});
+</script>
+</body></html>`;
+
 const BOOTSTRAP_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Bootstrap</title></head><body>
 <header><div id="draft" role="button">Working</div></header>
 <script>
@@ -536,6 +563,7 @@ export function startShop(port = Number(process.env.PORT ?? 4173)): Promise<Serv
     if (url.pathname === '/checkout/form') return res.end(CHECKOUT_PAGE);
     if (url.pathname === '/flow/start') return res.end(FLOW_PAGE);
     if (url.pathname === '/flow/auto') return res.end(AUTO_FLOW_PAGE);
+    if (url.pathname === '/quick/start') return res.end(QUICK_PAGE);
     if (url.pathname === '/bootstrap/start') return res.end(BOOTSTRAP_PAGE);
     if (url.pathname === '/embedded') return res.end(embeddedPage(port));
     if (url.pathname === '/embedded/settings') return res.end(`<!doctype html><title>Frame settings</title>${SETTINGS_FRAME}`);

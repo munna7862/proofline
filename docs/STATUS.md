@@ -69,6 +69,8 @@ One line per finished task: date, task id, result, the verify summary line.
 
 - 2026-11-26 Sprint 5 coverage configuration. The optional file works in the Playwright reporter and CLI rebuild. The configured demo groups both Help views and applies view and control ignores for 47 of 117 controls. Verify passed with 84 of 84 unit tests and default calibration reporting `UI coverage 39.7% (48/121) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
+- 2026-11-28 S4-T6 capture timing (founder approved 2026-11-28). A trusted interaction first runs any pending inventory scan, and held controls on a fast view are recovered outside header and navigation landmarks when the same node stays visible under the same parent. Several fast views in a row are each confirmed when the first of them settles. The quick-form demo adds 8 controls across four views, 2 tested; the old agent missed the form view's Cancel and Theme controls. Calibration moved from `UI coverage 39.7% (48/121)` to `UI coverage 38.8% (50/129) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)` because of the new demo controls only. Verify passed with 84 of 84 unit tests; the real demo, scan and ground-truth check passed. Epic Stack now meets the two-run denominator criterion and Buggy Books misses it by two controls, so S4-T6 remains open. See "Capture-timing follow-up".
+
 ## Sprint 4 local trial rerun
 
 The original trial directories were unavailable. The reconstructed Windows checkouts use Buggy Books `e3f686a2` and Epic Stack `8473afd804b6`, with the same 55 and 24 discovered tests as documented in Sprint 3. Buggy Books used Chromium with four configured workers for coverage. Epic Stack used one worker and its production build with local mocks because the development server did not become ready. Both fault scans used two workers and a cap of 20 faults. The original and reconstructed runs are a comparison across setups.
@@ -120,6 +122,19 @@ Epic Stack measured 69 of 198 (34.8%) and 74 of 188 (39.4%), excluding 2 and 0 o
 ### Fast-view follow-up
 
 The Epic Stack reruns with package `13eee0c` touched 74 of 200 (37.0%) and 74 of 199 (37.2%) controls. All 24 tests passed in both runs. The remaining inventory difference comprised two changing generated labels present in both runs, two untouched controls on the two-factor verification view seen only in run 1, and one untouched theme control on the new-note view seen only in run 2. The two-run denominator criterion remains open. The spot-check and fault outcomes above are from the original trial.
+
+### Capture-timing follow-up
+
+Cause of the `13eee0c` Epic Stack gap: a test can leave a view before the agent's 250 ms debounced scan, or before the 600 ms hold on controls carried over from the previous view. The two-factor verification test filled the code and submitted before the scan recorded Cancel and the Verify breadcrumb. The footer theme switch sits outside header and navigation landmarks, so it was recorded only on each test's first view or its final view. A third case appeared during the rerun: when the test left two fast views in a row, the second departure replaced the first before it was confirmed.
+
+The capture-timing package recorded the same denominator in both Epic Stack runs: 74 of 226 (32.7%), with all 24 tests passing each time. The two runs differ only by four one-for-one swaps of generated names. Compared with the `13eee0c` runs, the added rows are persistent layout on fast views: the footer theme switch on seven or eight views, the header on the change-email and forgot-password views, the settings breadcrumbs, and the notes sidebar on the new-note and note-edit views. Owner links on the notes view now come from three or more tests, so they group as one per-test row. The photo page's Reset button, visible once a file is chosen, and run 2's Cancel and Verify controls on the two-factor verification view come from the interaction flush. On the new-note view, the create-notes test ends on the home page, where the notes sidebar is gone, so its owner link stays out in both runs.
+
+Buggy Books recorded 46 of 133 (34.6%) and 46 of 135 (34.1%), with all 55 tests passing in both runs. Both extra rows are the header's Login and Sign Up links on `/cart`. Two tests click Logout on the cart, and the header renders those links before the app moves to `/login`. Run 2 scanned in between; run 1 left first. These are new controls on the view rather than held ones, so the new rules do not cover them. Two-run stability on Buggy Books remains open.
+
+Sprint 5 candidates from this rerun:
+- Record controls that appear during a view and are still visible when it is left, without attributing a router's early render of the next view to the old one. Needs approval (inventory rule).
+- The Epic Stack passkey button changes its label on the same node through several states, ending with "You're logged in! Navigating...". The final label became a row in one run of an earlier package. Renames are tracked only for form fields. Needs approval (inventory rule).
+- Chromium fires `change` on a focused field that the app removes. When the app has already pushed the next URL, the field is credited under the next view.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):
