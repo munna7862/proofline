@@ -357,7 +357,8 @@ document.getElementById('start').addEventListener('click', () => {
 
 // A form view the app leaves on the first keystroke, before the agent's debounced scan.
 // The footer control is plain layout (no header or nav) and persists across every view;
-// the old step lingers into the form view and is gone once the done view settles.
+// the old step lingers into the form view and unmounts before the form view's hold ends,
+// so it stays out of every later view however fast the test is.
 const QUICK_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Quick form</title></head><body>
 <main><button id="begin">Begin quick form</button></main>
 <div id="old-step"><button>Old step</button></div>
@@ -366,6 +367,7 @@ const QUICK_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><
 const main = document.querySelector('main');
 document.getElementById('begin').addEventListener('click', () => {
   history.pushState(null, '', '/quick/form');
+  setTimeout(() => document.getElementById('old-step').remove(), 500);
   main.innerHTML = '<label>Code <input id="code"></label><button id="cancel">Cancel code</button>';
   document.getElementById('code').addEventListener('input', () => {
     // Removing the focused field fires its change event, so finish the form view first.
@@ -375,7 +377,6 @@ document.getElementById('begin').addEventListener('click', () => {
     setTimeout(() => {
       main.textContent = 'Quick form done';
       history.pushState(null, '', '/quick/done');
-      setTimeout(() => document.getElementById('old-step').remove(), 300);
     }, 100);
   });
 });

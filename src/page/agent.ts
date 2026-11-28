@@ -729,9 +729,12 @@ export function proofAgent(opts: AgentOptions): void {
     // Several fast views in a row each wait here until a view finally settles.
     const departures = pendingDepartures;
     pendingDepartures = [];
+    const positionOf = positionsInSnapshot();
     for (const { view: departed, controls } of departures) {
       const restored = controls.flatMap(({ node, anchor, element }) => {
         if (!node.matches(opts.interactiveSelector) || visibleAnchor(node) !== anchor) return [];
+        // A node the app reused for different content is no longer the control seen at departure.
+        if (measure(node, positionOf, departed).key !== element.key) return [];
         const entry = observe(node, departed, element);
         return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
       });
