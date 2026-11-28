@@ -140,8 +140,7 @@ S4-T0, S4-T5 and S4-T6 need no new rule:
   > Run npm pack in C:\Workspace\proofline and install the tarball in both repos under C:\Workspace\proofline-trials on branch proofline-trial. Run each suite's coverage twice (epic-stack with --workers=1) and npx proofline scan --max-mutants 20 once. Compare with the S3 columns in docs/STATUS.md and add a before/after table. Spot-check 20 elements per suite by reading the tests; log any miss as a Sprint 5 candidate. Do not push or publish anything.
 
 - [x] **S4-T7 Trial write-up for the QA leads (1.5 h)**
-  - Done locally on 2026-11-25. The brief is private by design and kept out of this public repository. Its numbers come from the S4-T6 rerun in docs/STATUS.md.
-  S1-T5: the leads want to see the trial runs before deciding.
+  S1-T5: the leads want to see the trial runs before deciding. Done locally on 2026-11-25. The brief is private by design and kept out of this public repository. Its numbers come from the S4-T6 rerun in docs/STATUS.md.
   Accept:
   - `docs/trials/TRIALS_2026-10.md`, one page per suite. Each page covers:
     - What Proofline was given: the two-line integration.
