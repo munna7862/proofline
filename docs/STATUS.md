@@ -52,6 +52,9 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-25 S4-T5 done. The checkout demo adds six controls, four tested, including the single-control wrapper and the renamed password field. The two-control wrapper remains untouched. Verify passed with 71 of 71 unit tests and calibration reporting `UI coverage 53.5% (23/43) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 - 2026-11-25 S4-T5 review follow-up. Hidden and ignored descendants leave wrapper credit intact. Renames preserve each field's interaction history and keep synthetic form and textbox values out of coverage, including during type changes and when another control references the textbox. Verify passed with 72 of 72 unit tests and calibration reporting `UI coverage 53.3% (24/45) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
+- 2026-11-25 S4-T6 trial rerun completed locally. Both spot-checks met the 19-of-20 bar. Both denominator comparisons missed the acceptance criterion, so S4-T6 remains open. The trials used the verified package from merged commit `05aeeeb`. Follow-up reruns are in "Sprint 4 local trial rerun": Buggy Books now meets the denominator criterion; Epic Stack still misses it.
+- 2026-11-25 S4-T7 done locally. The reviewed brief (`docs/trials/TRIALS_2026-10.md`) is kept private and out of this repository; it records the coverage limits, confirmed fault outcomes, and both spot-checks. Verify passed with 72 of 72 unit tests and calibration reporting `UI coverage 53.3% (24/45) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+
 - 2026-11-25 Coverage grouping now distinguishes separate DOM positions that share a display path. The demo has three new untouched navigation links and keeps grouping the three labels of the per-user link. Verify passed with 74 of 74 unit tests and calibration reporting `UI coverage 50% (24/48) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 - 2026-11-25 Coverage grouping review follow-up. Unique ID anchors preserve stable groups, and controls with changing locations or duplicate IDs keep separate rows. The demo adds six untouched links for the review cases. Verify passed with 78 of 78 unit tests and calibration reporting `UI coverage 44.4% (24/54) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
@@ -65,6 +68,58 @@ One line per finished task: date, task id, result, the verify summary line.
 - 2026-11-26 Open shadow root review follow-up. Cloned drafts stay private, adopted components count in their destination, and host movement or style changes preserve interaction credit. Hidden projected controls and detached uploads stay outside coverage. Verify passed with 80 of 80 unit tests and calibration reporting `UI coverage 39.7% (48/121) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
 
 - 2026-11-26 Sprint 5 coverage configuration. The optional file works in the Playwright reporter and CLI rebuild. The configured demo groups both Help views and applies view and control ignores for 47 of 117 controls. Verify passed with 84 of 84 unit tests and default calibration reporting `UI coverage 39.7% (48/121) | Fault check 93.8% (15 caught, 1 slipped, 1 unstable, 10 n/a)`.
+
+## Sprint 4 local trial rerun
+
+The original trial directories were unavailable. The reconstructed Windows checkouts use Buggy Books `e3f686a2` and Epic Stack `8473afd804b6`, with the same 55 and 24 discovered tests as documented in Sprint 3. Buggy Books used Chromium with four configured workers for coverage. Epic Stack used one worker and its production build with local mocks because the development server did not become ready. Both fault scans used two workers and a cap of 20 faults. The original and reconstructed runs are a comparison across setups.
+
+### Buggy Books
+
+| Measure | Sprint 3 | Sprint 4 |
+|---|---|---|
+| Coverage run 1 | 45 of 126 (36%) | 44 of 126 (34.9%) |
+| Coverage run 2 | 45 of 126 (36%) | 46 of 124 (37.1%) |
+| Coverage records excluded | None under the Sprint 3 rule | 4 of 54 in each run |
+| Fault outcomes out of 20 planned | 11 caught, 3 slipped, 1 unstable, 5 not applicable, 0 not reached | 10 caught, 5 slipped, 0 unstable, 5 not applicable, 0 not reached |
+| Fault score | 78.6% (11 of 14) | 66.7% (10 of 15) |
+| Spot-check | 18 of 20 | 19 of 20 |
+
+- Both the Proceed to Checkout button and its enclosing link were credited in the same eight passing tests in each run. The alternate password label came from the intentional orphaned-label scenario, where the ID and label association stay absent throughout the test. Username had the same extra row outside the sample.
+- With the same 49 passing test IDs, coverage was 44 of 126 and 44 of 124. In the second run, Catalog, Cart, and Checkout at `/books/:id` shared a reported path and appeared together in one test's inventory. Proofline grouped the three separate links. Assigning distinct structural positions in a local counterfactual restored the denominator to 126 in both runs.
+- The scan used 52 of 54 passing baseline records and took about 50 minutes. Catalog Wrong numbers slipped through all 47 tests that received the changed response. For cart Missing text, 12 of 35 dependent tests received a changed response and stayed green.
+
+### Epic Stack
+
+| Measure | Sprint 3 | Sprint 4 |
+|---|---|---|
+| Coverage run 1 | 65 of 224 (29%) | 52 of 187 (27.8%) |
+| Coverage run 2 | 69 of 228 (30%) | 74 of 174 (42.5%) |
+| Coverage records excluded | None under the Sprint 3 rule | 3 of 24 in run 1, 0 of 24 in run 2 |
+| Fault outcomes out of 20 planned | 13 caught, 0 slipped, 1 unstable, 0 not applicable, 6 not reached | 18 caught, 0 slipped, 0 unstable, 0 not applicable, 2 not reached |
+| Fault score | 100% (13 of 13) | 100% (18 of 18) |
+| Spot-check | 18 of 20 | 20 of 20 |
+
+- The passkey test's User menu press was credited. Controls touched only in failed onboarding, recovery, or two-factor authentication tests remained untouched in the report.
+- On the same 21 passing tests, coverage was 52 of 187 and 52 of 152. Untouched header and sidebar controls account for most of the difference. An isolated Chromium reproduction omitted a persistent header on a 45 ms intermediate view and captured it at 1,100 ms. The raw trial records do not establish which missed rows came from that transition hold.
+- The scan used 24 of 24 passing baseline tests. Two faults on `POST /auth/github.data` were not reached by their three dependent tests and were outside the score.
+
+### Sprint 5 candidates from the rerun
+
+- Keep sibling controls in separate per-test groups when their reported CSS paths match. (Done 2026-11-25, see log.)
+- Preserve persistent shell inventory on fast intermediate views and retain the route-transition bleed protection. (Done 2026-11-25, see log.)
+- Investigate whether normal and intentional accessibility-chaos variants of the same field should share a coverage row.
+
+Raw reports, logs, and audit evidence are under `.proofline/trials` locally.
+
+### Sibling-grouping follow-up
+
+The follow-up package at `875fa13` predates the merge commit `2a4f879` and contains the same source. Buggy Books measured 44 of 133 (33.1%) and 46 of 133 (34.6%) in two coverage reruns, excluding 4 and 2 of 54 recorded tests. Catalog, Cart, and Checkout each kept their own book-detail row in both runs. Fault scan results above are from the original trial package.
+
+Epic Stack measured 69 of 198 (34.8%) and 74 of 188 (39.4%), excluding 2 and 0 of 24 tests. Restricting both reports to the same 22 passing tests gives 69 of 198 and 69 of 183. On those common tests, the note-edit view alone changed from 16 to 8 inventoried controls. Buggy Books met the repeated-denominator criterion after the fix. Epic Stack still misses it, so the sprint gate remains open.
+
+### Fast-view follow-up
+
+The Epic Stack reruns with package `13eee0c` touched 74 of 200 (37.0%) and 74 of 199 (37.2%) controls. All 24 tests passed in both runs. The remaining inventory difference comprised two changing generated labels present in both runs, two untouched controls on the two-factor verification view seen only in run 1, and one untouched theme control on the new-note view seen only in run 2. The two-run denominator criterion remains open. The spot-check and fault outcomes above are from the original trial.
 
 ## Sprint 2 candidates
 From S1-T6 (evidence in the trial branches `proofline-trial` of each repo; ranked by impact on trust in the numbers):

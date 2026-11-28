@@ -7,3 +7,5 @@ playwright-report/
 *.vsix
 .env
 vscode-extension/out/
+# Private trial briefs for QA leads stay local
+docs/trials/
