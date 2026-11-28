@@ -654,18 +654,21 @@ export function proofAgent(opts: AgentOptions): void {
   // Route-transition bleed: after a client-side route change, the old view often stays mounted
   // for a moment (exit animations, late route swaps). Elements already on the page when the view
   // changed are recorded under the new view only once they are still there HOLD_MS later (the
-  // end-of-test flush waits for that too). Shared layout (nav, header) survives; leftovers do not.
+  // end-of-test flush waits for that too). Shared layout (nav, header, footer) survives; leftovers
+  // do not. When the test leaves a view before its hold ends, the held controls still visible at
+  // departure are recorded for that view once the next view settles, if the same nodes are still
+  // visible in the same place: header or navigation landmark, otherwise the same parent.
   const HOLD_MS = 600;
   const SHELL_SELECTOR = 'header,nav,[role=banner],[role=navigation]';
   type Departure = {
     view: string;
-    controls: { node: Element; landmark: Element; element: ObservedElement }[];
+    controls: { node: Element; anchor: Element; element: ObservedElement }[];
   };
   let currentView = '';
   let carried: WeakSet<Element> = new WeakSet();
   let changedAt = 0;
   let awaitingSettleScan = false;
-  let pendingDeparture: Departure | undefined;
+  let pendingDepartures: Departure[] = [];
   let started = false;
   let settleTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -704,31 +707,39 @@ export function proofAgent(opts: AgentOptions): void {
     if (started) scheduleScan();
   };
 
-  const visibleShell = (node: Element) => {
+  // Where a held control sits while it stays visible: its header or navigation landmark, or
+  // else its parent. Null when it is hidden, detached or ignored.
+  const visibleAnchor = (node: Element) => {
     if (!node.isConnected || isIgnored(node) || closestInTree(node, '[hidden],[aria-hidden="true"]') || !inVisibleFrame()) return null;
-    const landmark = closestInTree(node, SHELL_SELECTOR);
-    if (!landmark) return null;
+    const anchor = closestInTree(node, SHELL_SELECTOR) ?? composedParent(node);
+    if (!anchor) return null;
     if (typeof node.checkVisibility === 'function') {
-      return node.checkVisibility({ opacityProperty: true, visibilityProperty: true }) ? landmark : null;
+      return node.checkVisibility({ opacityProperty: true, visibilityProperty: true }) ? anchor : null;
     }
     const visibility = getComputedStyle(node).visibility;
     if (visibility === 'hidden' || visibility === 'collapse' || !isVisible(node)) return null;
     for (let ancestor: Element | null = node; ancestor; ancestor = composedParent(ancestor)) {
       if (getComputedStyle(ancestor).opacity === '0') return null;
     }
-    return landmark;
+    return anchor;
   };
 
   const confirmDeparture = (settled = Date.now() - changedAt >= HOLD_MS) => {
-    if (!pendingDeparture || !settled) return;
-    const { view: departed, controls } = pendingDeparture;
-    pendingDeparture = undefined;
-    const restored = controls.flatMap(({ node, landmark, element }) => {
-      if (!node.matches(opts.interactiveSelector) || visibleShell(node) !== landmark) return [];
-      const entry = observe(node, departed, element);
-      return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
-    });
-    if (restored.length) emit({ type: 'inventory', view: departed, elements: restored });
+    if (!pendingDepartures.length || !settled) return;
+    // Several fast views in a row each wait here until a view finally settles.
+    const departures = pendingDepartures;
+    pendingDepartures = [];
+    const positionOf = positionsInSnapshot();
+    for (const { view: departed, controls } of departures) {
+      const restored = controls.flatMap(({ node, anchor, element }) => {
+        if (!node.matches(opts.interactiveSelector) || visibleAnchor(node) !== anchor) return [];
+        // A node the app reused for different content is no longer the control seen at departure.
+        if (measure(node, positionOf, departed).key !== element.key) return [];
+        const entry = observe(node, departed, element);
+        return entry.fresh ? [{ ...entry.element, nodeId: entry.nodeId }] : [];
+      });
+      if (restored.length) emit({ type: 'inventory', view: departed, elements: restored });
+    }
   };
 
   const captureDeparture = (): Departure | undefined => {
@@ -742,8 +753,8 @@ export function proofAgent(opts: AgentOptions): void {
     const positionOf = positionsInSnapshot();
     for (const node of queryControls(opts.interactiveSelector)) {
       if (!carried.has(node)) continue;
-      const landmark = visibleShell(node);
-      if (landmark) controls.push({ node, landmark, element: measure(node, positionOf, currentView) });
+      const anchor = visibleAnchor(node);
+      if (anchor) controls.push({ node, anchor, element: measure(node, positionOf, currentView) });
     }
     if (controls.length) return { view: currentView, controls };
   };
@@ -755,7 +766,7 @@ export function proofAgent(opts: AgentOptions): void {
     if (!frameChain.length) emit({ type: 'view', view });
     else if (inVisibleFrame()) visitFrameView(view);
     if (view !== currentView) {
-      pendingDeparture = departure;
+      if (departure) pendingDepartures.push(departure);
       currentView = view;
       carried = new WeakSet();
       try {
@@ -807,6 +818,25 @@ export function proofAgent(opts: AgentOptions): void {
       timer = null;
       scan();
     }, 250);
+  };
+
+  // A trusted interaction can make the app leave the view before the debounced scan runs.
+  // Run a pending scan first, so the view's visible controls are inventoried as the test
+  // sees them when it acts. Held controls still wait for the hold.
+  const flushPendingScan = () => {
+    if (!started) return;
+    try {
+      // Deliver edits from this same task first: they classify fields, so their values stay
+      // private, and schedule the scan that this flush then runs.
+      const queued = documentObserver.takeRecords();
+      if (queued.length) onDomChanges(queued);
+      if (!timer) return;
+      clearTimeout(timer);
+      timer = null;
+      scan();
+    } catch {
+      /* never break the app */
+    }
   };
 
   // A frame can become visible due to embedding attributes or CSS layout.
@@ -872,6 +902,7 @@ export function proofAgent(opts: AgentOptions): void {
     const target = ev.composedPath()[0] as Element | undefined;
     if (!target?.isConnected || target.ownerDocument !== document || typeof target.closest !== 'function') return;
     if ((!ev.isTrusted && !isFileFill(ev, target)) || !inVisibleFrame() || insideClosedRoot(target)) return;
+    flushPendingScan();
     const el = closestInTree(target, opts.interactiveSelector);
     if (!el || isIgnored(el)) return;
     // Browsers deliver pointerdown to some children of disabled buttons even when clicks are suppressed.

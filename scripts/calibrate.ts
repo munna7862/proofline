@@ -206,6 +206,16 @@ const tests: DemoTest[] = [
       await page.getByRole('button', { name: 'Start quick flow' }).click({ timeout: 2000 });
     },
   },
+  {
+    testId: 'quick-form', title: 'submits a quick form on the first keystroke',
+    file: 'demo/tests/fast-flow.spec.ts', line: 22, start: '/quick/start',
+    body: async (page) => {
+      await page.getByRole('button', { name: 'Begin quick form' }).click({ timeout: 2000 });
+      await page.getByRole('textbox', { name: 'Code' }).fill('1', { timeout: 2000 });
+      await eventually(async () => (await textOf(page, 'main')) === 'Quick form done', 'quick form done');
+      await eventually(async () => new URL(page.url()).pathname === '/quick/done', 'quick form final view');
+    },
+  },
   // demo/tests/embedded.spec.ts: routed and inline same-origin frames.
   {
     testId: 'embedded', title: 'uses same-origin embedded controls',
